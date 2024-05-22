@@ -13,6 +13,6 @@ pub struct Console{
 
 fn main() -> ExitCode {
     let mut snes = Console { cpu: CPU::new() };
-    interpret_opcode(snes);
+    interpret_opcode(&mut snes);
     ExitCode::SUCCESS
 }

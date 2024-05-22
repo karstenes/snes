@@ -1,4 +1,4 @@
-use std::{fmt::format, fs, path::Path, simd::LaneCount, str};
+use std::{fs, path::Path, str};
 use anyhow::{Result, Context, bail};
 use num_enum::TryFromPrimitive;
 
