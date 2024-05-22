@@ -123,6 +123,6 @@ impl CPU {
     }
 }
 
-fn interpret_opcode(snes: Console) -> Console {
-    snes
+pub fn interpret_opcode(&mut snes: Console) {
+    
 }

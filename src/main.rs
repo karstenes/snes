@@ -1,6 +1,8 @@
 mod cpu;
+mod cartridge;
 
-use cpu::CPU;
+use cartridge::*;
+use cpu::*;
 use std::process::ExitCode;
 
 #[allow(non_snake_case)]
@@ -10,8 +12,7 @@ pub struct Console{
 }
 
 fn main() -> ExitCode {
-    let _test = CPU::new();
-    let _test2 = _test.A;
-
+    let mut snes = Console { cpu: CPU::new() };
+    interpret_opcode(snes);
     ExitCode::SUCCESS
 }
