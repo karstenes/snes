@@ -1,19 +1,22 @@
 use std::{fs, path::Path, str};
 use anyhow::{Result, Context, bail};
 use num_enum::TryFromPrimitive;
+use log::{info, debug};
 
+#[derive(Debug)]
 pub enum MapMode {
     LoROM = 0,
     HiROM = 1,
     ExHiROM = 5
 }
 
+#[derive(Debug)]
 pub enum RomSpeed {
     Slow,
     Fast
 }
 
-#[derive(TryFromPrimitive)]
+#[derive(TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum ExtraHardware {
     RomOnly,
@@ -25,7 +28,7 @@ pub enum ExtraHardware {
     RomCoprocessorBattery,
 }
 
-#[derive(TryFromPrimitive)]
+#[derive(TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum Coprocessor {
     DSP,
@@ -39,6 +42,7 @@ pub enum Coprocessor {
     Custom = 0xF
 }
 
+#[derive(Debug)]
 pub enum ChipsetSubtype {
     SPC7110,
     ST010,
@@ -46,18 +50,20 @@ pub enum ChipsetSubtype {
     CX4
 }
 
+#[derive(Debug)]
 pub struct CartHardware {
     extra_hardware: ExtraHardware,
     coprocessor: Coprocessor
 }
  
-#[derive(TryFromPrimitive)]
+#[derive(TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum Region {
     NTSC,
     PAL
 }
 
+#[derive(Debug)]
 pub struct ExpandedHeader {
     maker_code: String,
     game_code: String,
@@ -69,6 +75,7 @@ pub struct ExpandedHeader {
     chipset_subtype: ChipsetSubtype
 }
 
+#[derive(Debug)]
 pub struct RomHeader {
     title: String,
     map_mode: MapMode,
@@ -87,6 +94,7 @@ pub struct RomHeader {
     expanded_header: Option<ExpandedHeader>
 }
 
+#[derive(Debug)]
 pub struct Cartridge {
     header: RomHeader,
     rom_data: Vec<u8>
@@ -99,15 +107,17 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
 
     let checksum_complement = checksum ^ 0xFFFF;
 
+    debug!("Checksum {:04X} and Complement {:04X}", checksum, checksum_complement);
+    
     let mapping = 
-    if (file[0x75DC] as u16) << 8 & (file[0x75DD] as u16) == checksum_complement &&
-        (file[0x75DE] as u16) << 8 & (file[0x75DF] as u16) == checksum {
+    if (file[0x75DC] as u16) << 8 | (file[0x75DD] as u16) == checksum_complement &&
+        (file[0x75DE] as u16) << 8 | (file[0x75DF] as u16) == checksum {
             MapMode::LoROM
-    } else if (file[0xFFDC] as u16) << 8 & (file[0xFFDD] as u16) == checksum_complement &&
-        (file[0xFFDE] as u16) << 8 & (file[0xFFDF] as u16) == checksum {
+    } else if (file[0xFFDC] as u16) << 8 | (file[0xFFDD] as u16) == checksum_complement &&
+        (file[0xFFDE] as u16) << 8 | (file[0xFFDF] as u16) == checksum {
             MapMode::HiROM
-    } else if (file[0x40FFDC] as u16) << 8 & (file[0x40FFDD] as u16) == checksum_complement &&
-        (file[0x40FFDE] as u16) << 8 & (file[0x40FFDF] as u16) == checksum {
+    } else if (file[0x40FFDC] as u16) << 8 | (file[0x40FFDD] as u16) == checksum_complement &&
+        (file[0x40FFDE] as u16) << 8 | (file[0x40FFDF] as u16) == checksum {
             MapMode::ExHiROM
     } else {
         bail!("No checksum found in rom file. Is this a valid SNES rom?")
