@@ -88,7 +88,8 @@ pub struct RomHeader {
 }
 
 pub struct Cartridge {
-    header: RomHeader
+    header: RomHeader,
+    rom_data: Vec<u8>
 }
 
 pub fn load_rom(rom_file: &Path) -> Result<Cartridge> {
@@ -175,7 +176,7 @@ pub fn load_rom(rom_file: &Path) -> Result<Cartridge> {
         expanded_header: None
     };
 
-    let cart = Cartridge{
+    let cart = Cartridge {
         header
     };
 
