@@ -92,10 +92,7 @@ pub struct Cartridge {
     rom_data: Vec<u8>
 }
 
-pub fn load_rom(rom_file: &Path) -> Result<Cartridge> {
-    let file: Vec<u8> = fs::read(&rom_file)
-        .with_context(|| format!("Failed to read rom file {}", rom_file.display()))?;
-
+fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
     let checksum: u16 = file
                         .iter()
                         .fold(0u16, |sum, i| sum.wrapping_add(*i as u16));
@@ -176,8 +173,18 @@ pub fn load_rom(rom_file: &Path) -> Result<Cartridge> {
         expanded_header: None
     };
 
+    return Ok(header);
+}
+
+pub fn load_rom(rom_file: &Path) -> Result<Cartridge> {
+    let file: Vec<u8> = fs::read(&rom_file)
+        .with_context(|| format!("Failed to read rom file {}", rom_file.display()))?;
+
+    let header = load_rom_header(&file)?;    
+
     let cart = Cartridge {
-        header
+        header,
+        rom_data: file.clone()
     };
 
     return Ok(cart)
