@@ -229,14 +229,20 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
         let maker_code = str::from_utf8(&expanded_header_slice[0..=0x1])
                                 .context("Failed to maker code to a rust str")?
                                 .to_string();
+        debug!("Maker code {:}", maker_code);
         let game_code = str::from_utf8(&expanded_header_slice[0x2..=0x3])
                                 .context("Failed to game code to a rust str")?
                                 .to_string();
+        debug!("Game code {:}", game_code);
         let expansion_rom_size = 1usize << expanded_header_slice[0xC];
+        debug!("Expansion ROM size {:}kB", expansion_rom_size);
         let expansion_ram_size = 1usize << expanded_header_slice[0xD];
+        debug!("Expansion RAM size {:}kB", expansion_ram_size);
         let special_version = expanded_header_slice[0xE];
+        debug!("Special version {:02X}", special_version);
         let chipset_subtype = ChipsetSubtype::try_from((expanded_header_slice[0xF]) >> 4)
             .with_context(|| format!("Unknown Chipset Subtype {:02X}",(expanded_header_slice[0xF]) >> 4))?;
+        debug!("Chipset subtype {:?}", chipset_subtype);
         Some(ExpandedHeader {
             maker_code,
             game_code,

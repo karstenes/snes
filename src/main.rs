@@ -34,7 +34,7 @@ fn main() -> Result<()> {
         cartridge
     };
 
-    println!("{:04X}", memory::read_word(&mut snes, 0x10FFC0)?);
+    println!("{:04X}", memory::read_word(&mut snes, 0xD10120)?);
 
     return Ok(());
 }
