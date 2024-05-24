@@ -1,5 +1,5 @@
 use std::{fs, path::Path, str};
-use anyhow::{Result, Context, bail};
+use anyhow::{Result, Context, bail, };
 use num_enum::TryFromPrimitive;
 use log::{info, debug};
 
@@ -53,14 +53,14 @@ pub enum ChipsetSubtype {
 #[derive(Debug)]
 pub struct CartHardware {
     extra_hardware: ExtraHardware,
-    coprocessor: Coprocessor
+    coprocessor: Option<Coprocessor>
 }
  
 #[derive(TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum Region {
-    NTSC,
-    PAL
+    PAL,
+    NTSC
 }
 
 #[derive(Debug)]
@@ -96,69 +96,120 @@ pub struct RomHeader {
 
 #[derive(Debug)]
 pub struct Cartridge {
-    header: RomHeader,
-    rom_data: Vec<u8>
+    pub header: RomHeader,
+     pub rom_data: Vec<u8>
 }
 
 fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
-    let checksum: u16 = file
-                        .iter()
-                        .fold(0u16, |sum, i| sum.wrapping_add(*i as u16));
+    if file.len() % 1024 != 0 {
+        debug!("Rom Dumper header found in file.");
+    }
+
+    let mut section_1_length: usize = 0x8000;
+    while section_1_length*2 <= file.len() {
+        section_1_length *= 2;
+    }
+    let checksum: u16 = if section_1_length != file.len() {
+        let mut section_2_length: usize = 0x8000;
+        while section_2_length*2 + section_1_length <= file.len() {
+            section_2_length *= 2;
+        }
+        if section_1_length + section_2_length != file.len() {
+            bail!("Rom is not a power of 2 size.")
+        }
+        let section_1_sum = file[..section_1_length]
+                                    .iter()
+                                    .fold(0u16, |sum, i| sum.wrapping_add(*i as u16));
+        let section_2_sum = file[section_1_length..]
+                                    .iter()
+                                    .fold(0u16, |sum, i| sum.wrapping_add(*i as u16));
+        section_1_sum.wrapping_add(section_2_sum.wrapping_mul(2))
+    } else {                      
+        file
+            .iter()
+            .fold(0u16, |sum, i| sum.wrapping_add(*i as u16))
+    };
+    
+
+    // let checksum: u16 = file
+    //                     .iter()
+    //                     .fold(0u16, |sum, i| sum.wrapping_add(*i as u16));
 
     let checksum_complement = checksum ^ 0xFFFF;
 
     debug!("Checksum {:04X} and Complement {:04X}", checksum, checksum_complement);
-    
     let mapping = 
-    if (file[0x75DC] as u16) << 8 | (file[0x75DD] as u16) == checksum_complement &&
-        (file[0x75DE] as u16) << 8 | (file[0x75DF] as u16) == checksum {
+    if (file[0x7FDC] as u16) | (file[0x7FDD] as u16) << 8 == checksum_complement &&
+        (file[0x7FDE] as u16) | (file[0x7FDF] as u16) << 8 == checksum {
             MapMode::LoROM
-    } else if (file[0xFFDC] as u16) << 8 | (file[0xFFDD] as u16) == checksum_complement &&
-        (file[0xFFDE] as u16) << 8 | (file[0xFFDF] as u16) == checksum {
+    } else if (file[0xFFDC] as u16) | (file[0xFFDD] as u16) << 8 == checksum_complement &&
+        (file[0xFFDE] as u16) | (file[0xFFDF] as u16) << 8 == checksum {
             MapMode::HiROM
-    } else if (file[0x40FFDC] as u16) << 8 | (file[0x40FFDD] as u16) == checksum_complement &&
-        (file[0x40FFDE] as u16) << 8 | (file[0x40FFDF] as u16) == checksum {
-            MapMode::ExHiROM
     } else {
-        bail!("No checksum found in rom file. Is this a valid SNES rom?")
+        if file.len() < 0x40FFDF {
+            bail!("No checksum found in rom file. Is this a valid SNES rom?")
+        }
+        MapMode::ExHiROM
     };
 
+    debug!("Found {:?} mode ROM", mapping);
+
     let header_slice = match mapping {
-        MapMode::LoROM => &file[0x7FC0..=0x7FE0],
-        MapMode::HiROM => &file[0xFFC0..=0xFFE0],
-        MapMode::ExHiROM => &file[0x40FFC0..=0x40FFE0]
+        MapMode::LoROM => &file[0x7FC0..=0x7FFF],
+        MapMode::HiROM => &file[0xFFC0..=0xFFFF],
+        MapMode::ExHiROM => &file[0x40FFC0..=0x40FFFF]
     };
 
     let title = str::from_utf8(&header_slice[0..=0x14])
         .context("Failed to convert cartridge title to a rust str")?
         .to_string();
 
+    info!("ROM is \"{:}\"", title.trim_end());
+
     let rom_speed = match header_slice[0x15] & 0b00010000 {
         0 => RomSpeed::Slow,
         _ => RomSpeed::Fast
     };
 
+    debug!("Rom speed is {:?}", rom_speed);
+
     let hardware = ExtraHardware::try_from(header_slice[0x16] & 0xF)
         .with_context(|| format!("Unknown Hardware {:02X}", header_slice[0x16] & 0xF))?;
 
-    let coprocessor = Coprocessor::try_from((header_slice[0x16] & 0xF0) >> 4)
-        .with_context(|| format!("Unknown Coprocessor {:02X}",(header_slice[0x16] & 0xF0) >> 4))?;
+    
+    let coprocessor = match header_slice[0x16] & 0x0F {
+        3 | 4 | 5 | 6 => Some(
+                            Coprocessor::try_from((header_slice[0x16] & 0xF0) >> 4)
+                            .with_context(|| format!("Unknown Coprocessor {:02X}",(header_slice[0x16] & 0xF0) >> 4))?
+                        ),
+        _ => None
+    };
 
     let extra_hardware = CartHardware {
         extra_hardware: hardware,
         coprocessor
     };
 
+    debug!("Extra hardware: {:?}", extra_hardware);
+
     let rom_size = 1usize << header_slice[0x17];
 
     let ram_size = 1usize << header_slice[0x18];
 
+    debug!("ROM size: {:}kB, RAM size: {:}kB", rom_size, ram_size);
+
     let country = Region::try_from(header_slice[0x19])
         .with_context(|| format!("Unknown region {:04X}", header_slice[0x19]))?;
 
+    debug!("Region: {:?}", country);
+
     let developer_id = header_slice[0x1A];
 
+    debug!("Developer ID: {:02X}", developer_id);
+
     let rom_version = header_slice[0x1B];
+
+    debug!("Rom Version: {:}", rom_version);
 
     let interrupt_vectors: [u16; 16] = header_slice[0x20..0x40]
         .chunks_exact(2)

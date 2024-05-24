@@ -1,10 +1,11 @@
+#![allow(dead_code, unused_variables)]
+
 mod cpu;
 mod cartridge;
 
 use anyhow::Ok;
 use cartridge::*;
 use cpu::*;
-use std::process::ExitCode;
 use std::env;
 use std::path;
 use anyhow::Result;
@@ -24,8 +25,6 @@ fn main() -> Result<()> {
     let file_path = path::Path::new(&args[1]);
 
     let cart = load_rom(file_path)?;
-
-    println!("{:?}", cart);
 
     return Ok(());
 }
