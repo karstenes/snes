@@ -1,5 +1,5 @@
 use std::{fs, path::Path, str};
-use anyhow::{Result, Context, bail, };
+use anyhow::{Result, Context, bail};
 use num_enum::TryFromPrimitive;
 use log::{info, debug};
 
@@ -78,21 +78,21 @@ pub struct ExpandedHeader {
 
 #[derive(Debug)]
 pub struct RomHeader {
-    title: String,
-    map_mode: MapMode,
-    rom_speed: RomSpeed,
-    extra_hardware: CartHardware, 
+    pub title: String,
+    pub map_mode: MapMode,
+    pub rom_speed: RomSpeed,
+    pub extra_hardware: CartHardware, 
     /// 1<<N Kilobytes, here stored as size in kB
-    rom_size: usize,
+    pub rom_size: usize,
     /// 1<<N Kilobytes, here stored as size in kB
-    ram_size: usize,
-    country: Region,
-    developer_id: u8,
-    rom_version: u8,
-    checksum_complement: u16,
-    checksum: u16,
-    interrupt_vectors: [u16;16],
-    expanded_header: Option<ExpandedHeader>
+    pub ram_size: usize,
+    pub country: Region,
+    pub developer_id: u8,
+    pub rom_version: u8,
+    pub checksum_complement: u16,
+    pub checksum: u16,
+    pub interrupt_vectors: [u16;16],
+    pub expanded_header: Option<ExpandedHeader>
 }
 
 #[derive(Debug)]

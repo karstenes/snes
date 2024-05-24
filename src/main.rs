@@ -2,6 +2,7 @@
 
 mod cpu;
 mod cartridge;
+mod memory;
 
 use anyhow::Ok;
 use cartridge::*;
@@ -14,8 +15,9 @@ use env_logger;
 #[allow(non_snake_case)]
 
 #[derive(Debug)]
-pub struct Console{
-    cpu: CPU
+pub struct Console {
+    cpu: CPU,
+    cartridge: Cartridge
 }
 
 fn main() -> Result<()> {
@@ -25,7 +27,14 @@ fn main() -> Result<()> {
 
     let file_path = path::Path::new(&args[1]);
 
-    let cart = load_rom(file_path)?;
+    let cartridge = load_rom(file_path)?;
+
+    let mut snes = Console {
+        cpu: CPU::new(),
+        cartridge
+    };
+
+    println!("{:04X}", memory::read_word(&mut snes, 0x10FFC0)?);
 
     return Ok(());
 }
