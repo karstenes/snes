@@ -39,7 +39,8 @@ fn read_rom_word(rom: &cartridge::Cartridge, addr: u32) -> Result<u16> {
             Ok((rom.rom_data[rom_addr] as u16) | (rom.rom_data[rom_addr+1] as u16) << 8)
         },
         MapMode::ExHiROM => {
-            unimplemented!()
+            let rom_addr = ((addr & 0x3FFFFF) + (((addr & 0x800000) ^ 0x800000) >> 1)) as usize;
+            Ok((rom.rom_data[rom_addr] as u16) | (rom.rom_data[rom_addr+1] as u16) << 8)
         }
     }
 }
