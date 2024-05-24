@@ -10,15 +10,23 @@ pub fn read_word(snes: &mut Console, addr: u32) -> Result<u16> {
     let addr_word = addr & 0xFFFF;
     match addr {
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80)) ||
-            bank >= 0xC0 || (bank >= 0x40 && bank < 0x7E) => {
-                read_rom_word(&snes.cartridge, addr)
-        },        
+                    bank >= 0xC0 || (bank >= 0x40 && bank < 0x7E) => {
+            read_rom_word(&snes.cartridge, addr)
+        },
+        addr if (bank >= 0x7E && bank < 0x80) ||
+                    ((bank < 0x40 || (bank >= 0x80 && bank < 0xC0)) && addr_word < 0x2000) => {
+            Ok(read_ram_word(&snes.ram, addr))
+        }    
         _ => {bail!("Memory access error! Tried to access {:06X}", addr)}
     }
 }
 
 pub fn read_byte(snes: &mut Console, addr: u32) -> Result<u8> {
     Ok(1)
+}
+
+fn read_ram_word(ram: &[u8; 0x1FFFF], addr: u32) -> u16 { 
+    ram[(addr & 0x1FFFF) as usize] as u16 + (ram[((addr & 0x1FFFF) + 1) as usize] << 8) as u16
 }
 
 fn read_rom_word(rom: &cartridge::Cartridge, addr: u32) -> Result<u16> {

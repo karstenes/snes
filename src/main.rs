@@ -17,7 +17,8 @@ use env_logger;
 #[derive(Debug)]
 pub struct Console {
     cpu: CPU,
-    cartridge: Cartridge
+    cartridge: Cartridge,
+    ram: [u8; 0x1FFFF]
 }
 
 fn main() -> Result<()> {
@@ -29,9 +30,12 @@ fn main() -> Result<()> {
 
     let cartridge = load_rom(file_path)?;
 
+    let mut ram = [0u8; 0x1FFFF];
+
     let mut snes = Console {
         cpu: CPU::new(),
-        cartridge
+        cartridge,
+        ram
     };
 
     println!("{:04X}", memory::read_word(&mut snes, 0xD10120)?);
