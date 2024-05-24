@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+#![allow(unused_variables, dead_code)]
 
 mod cpu;
 mod cartridge;
@@ -13,6 +13,7 @@ use env_logger;
 
 #[allow(non_snake_case)]
 
+#[derive(Debug)]
 pub struct Console{
     cpu: CPU
 }

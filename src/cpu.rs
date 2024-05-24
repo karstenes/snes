@@ -124,5 +124,6 @@ impl CPU {
 }
 
 pub fn interpret_opcode(snes: &mut Console) {
-    println!("bruh")
+    println!("{:?}", snes);
+    println!("bruh");
 }

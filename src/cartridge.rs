@@ -42,7 +42,8 @@ pub enum Coprocessor {
     Custom = 0xF
 }
 
-#[derive(Debug)]
+#[derive(TryFromPrimitive,Debug)]
+#[repr(u8)]
 pub enum ChipsetSubtype {
     SPC7110,
     ST010,
@@ -97,7 +98,7 @@ pub struct RomHeader {
 #[derive(Debug)]
 pub struct Cartridge {
     pub header: RomHeader,
-     pub rom_data: Vec<u8>
+    pub rom_data: Vec<u8>
 }
 
 fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
@@ -218,6 +219,36 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
         .try_into()
         .unwrap();
 
+    let expanded_header = if developer_id == 0x33 || header_slice[0x14] == 0x0 {
+        debug!("Expanded header detected.");
+        let expanded_header_slice = match mapping {
+            MapMode::LoROM => &file[0x7FB0..=0x7FBF],
+            MapMode::HiROM => &file[0xFFB0..=0xFFBF],
+            MapMode::ExHiROM => &file[0x40FFB0..=0x40FFBF]
+        };
+        let maker_code = str::from_utf8(&expanded_header_slice[0..=0x1])
+                                .context("Failed to maker code to a rust str")?
+                                .to_string();
+        let game_code = str::from_utf8(&expanded_header_slice[0x2..=0x3])
+                                .context("Failed to game code to a rust str")?
+                                .to_string();
+        let expansion_rom_size = 1usize << expanded_header_slice[0xC];
+        let expansion_ram_size = 1usize << expanded_header_slice[0xD];
+        let special_version = expanded_header_slice[0xE];
+        let chipset_subtype = ChipsetSubtype::try_from((expanded_header_slice[0xF]) >> 4)
+            .with_context(|| format!("Unknown Chipset Subtype {:02X}",(expanded_header_slice[0xF]) >> 4))?;
+        Some(ExpandedHeader {
+            maker_code,
+            game_code,
+            expansion_rom_size,
+            expansion_ram_size,
+            special_version,
+            chipset_subtype
+        })
+    } else {
+        None
+    };
+
     let header = RomHeader {
         title,
         map_mode: mapping,
@@ -231,7 +262,7 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
         checksum_complement,
         checksum,
         interrupt_vectors,
-        expanded_header: None
+        expanded_header
     };
 
     return Ok(header);
