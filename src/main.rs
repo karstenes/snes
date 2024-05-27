@@ -10,7 +10,7 @@ use cpu::*;
 use std::env;
 use std::path;
 use anyhow::Result;
-use env_logger;
+use pretty_env_logger;
 
 #[allow(non_snake_case)]
 
@@ -18,11 +18,11 @@ use env_logger;
 pub struct Console {
     cpu: CPU,
     cartridge: Cartridge,
-    ram: [u8; 0x1FFFF]
+    ram: Vec<u8>
 }
 
 fn main() -> Result<()> {
-    env_logger::init();
+    pretty_env_logger::init();
 
     let args: Vec<String> = env::args().collect();
 
@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 
     let cartridge = load_rom(file_path)?;
 
-    let mut ram = [0u8; 0x1FFFF];
+    let mut ram = vec![0; 0x200000];
 
     let mut snes = Console {
         cpu: CPU::new(),

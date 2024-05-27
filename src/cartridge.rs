@@ -68,9 +68,9 @@ pub enum Region {
 pub struct ExpandedHeader {
     maker_code: String,
     game_code: String,
-    /// 1<<N Kilobytes, here stored as size in kB
+    /// 1<<N Kilobytes, here stored as size in bytes
     expansion_rom_size: usize,
-    /// 1<<N Kilobytes, here stored as size in kB
+    /// 1<<N Kilobytes, here stored as size in bytes
     expansion_ram_size: usize,
     special_version: u8,
     chipset_subtype: ChipsetSubtype
@@ -82,9 +82,9 @@ pub struct RomHeader {
     pub map_mode: MapMode,
     pub rom_speed: RomSpeed,
     pub extra_hardware: CartHardware, 
-    /// 1<<N Kilobytes, here stored as size in kB
+    /// 1<<N Kilobytes, here stored as size in bytes
     pub rom_size: usize,
-    /// 1<<N Kilobytes, here stored as size in kB
+    /// 1<<N Kilobytes, here stored as size in bytes
     pub ram_size: usize,
     pub country: Region,
     pub developer_id: u8,
@@ -191,13 +191,13 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
         coprocessor
     };
 
-    debug!("Extra hardware: {:?}", extra_hardware);
+    debug!("Cartridge hardware: {:?}", extra_hardware);
 
-    let rom_size = 1usize << header_slice[0x17];
+    let rom_size = (1usize << header_slice[0x17]) * 1024;
 
-    let ram_size = 1usize << header_slice[0x18];
+    let ram_size = (1usize << header_slice[0x18]) * 1024;
 
-    debug!("ROM size: {:}kB, RAM size: {:}kB", rom_size, ram_size);
+    debug!("ROM size: {:}kB, RAM size: {:}kB", rom_size/1024, ram_size/1024);
 
     let country = Region::try_from(header_slice[0x19])
         .with_context(|| format!("Unknown region {:04X}", header_slice[0x19]))?;
@@ -234,10 +234,10 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
                                 .context("Failed to game code to a rust str")?
                                 .to_string();
         debug!("Game code {:}", game_code);
-        let expansion_rom_size = 1usize << expanded_header_slice[0xC];
-        debug!("Expansion ROM size {:}kB", expansion_rom_size);
-        let expansion_ram_size = 1usize << expanded_header_slice[0xD];
-        debug!("Expansion RAM size {:}kB", expansion_ram_size);
+        let expansion_rom_size = (1usize << expanded_header_slice[0xC])*1024;
+        debug!("Expansion ROM size {:}kB", expansion_rom_size/1024);
+        let expansion_ram_size = (1usize << expanded_header_slice[0xD])*1024;
+        debug!("Expansion RAM size {:}kB", expansion_ram_size/1024);
         let special_version = expanded_header_slice[0xE];
         debug!("Special version {:02X}", special_version);
         let chipset_subtype = ChipsetSubtype::try_from((expanded_header_slice[0xF]) >> 4)
