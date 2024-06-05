@@ -65,6 +65,20 @@ pub enum Region {
 }
 
 #[derive(Debug)]
+pub struct InterruptVectorTable {
+    pub cop: u16,
+    pub brk: u16,
+    pub abort: u16,
+    pub nmi: u16,
+    pub irq: u16,
+    pub cop_emu: u16,
+    pub abort_emu: u16,
+    pub nmi_emu: u16,
+    pub reset: u16,
+    pub irq_emu: u16
+}
+
+#[derive(Debug)]
 pub struct ExpandedHeader {
     maker_code: String,
     game_code: String,
@@ -91,7 +105,7 @@ pub struct RomHeader {
     pub rom_version: u8,
     pub checksum_complement: u16,
     pub checksum: u16,
-    pub interrupt_vectors: [u16;16],
+    pub interrupt_vectors: InterruptVectorTable,
     pub expanded_header: Option<ExpandedHeader>
 }
 
@@ -212,12 +226,23 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
 
     debug!("Rom Version: {:}", rom_version);
 
-    let interrupt_vectors: [u16; 16] = header_slice[0x20..0x40]
+    let interrupt_vector_slice = header_slice[0x24..0x40]
         .chunks_exact(2)
-        .map(|x| (x[0] as u16) & ((x[1] as u16) << 8))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
+        .map(|x| (x[0] as u16) | ((x[1] as u16) << 8))
+        .collect::<Vec<u16>>();
+
+    let interrupt_vectors = InterruptVectorTable {
+        cop: interrupt_vector_slice[0],
+        brk: interrupt_vector_slice[1],
+        abort: interrupt_vector_slice[2],
+        nmi: interrupt_vector_slice[3],
+        irq: interrupt_vector_slice[5],
+        cop_emu: interrupt_vector_slice[8],
+        abort_emu: interrupt_vector_slice[10],
+        nmi_emu: interrupt_vector_slice[11],
+        reset: interrupt_vector_slice[12],
+        irq_emu: interrupt_vector_slice[13]
+    };
 
     let expanded_header = if developer_id == 0x33 || header_slice[0x14] == 0x0 {
         debug!("Expanded header detected.");
