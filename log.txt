@@ -1,0 +1,81 @@
+   Compiling snes v0.1.0 (C:\Users\kschn\Documents\gits\snes)
+warning: unused import: `ensure`
+ --> src\cpu.rs:2:20
+  |
+2 | use anyhow::{bail, ensure, Result};
+  |                    ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::fs::read`
+ --> src\memory.rs:1:5
+  |
+1 | use std::fs::read;
+  |     ^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> src\memory.rs:6:28
+  |
+6 | use anyhow::{bail, ensure, Context, Result};
+  |                            ^^^^^^^
+
+warning: unused imports: `debug`, `info`
+ --> src\memory.rs:8:11
+  |
+8 | use log::{debug, info, trace};
+  |           ^^^^^  ^^^^
+
+warning: unused import: `anyhow::Context`
+ --> src\main.rs:7:5
+  |
+7 | use anyhow::Context;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `crossterm::QueueableCommand`
+  --> src\main.rs:12:5
+   |
+12 | use crossterm::QueueableCommand;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `KeyEventKind`, `KeyEvent`, `queue`
+  --> src\main.rs:19:35
+   |
+19 |     event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+   |                                   ^^^^^^^^  ^^^^^^^^^^^^
+20 |     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+21 |     queue
+   |     ^^^^^
+
+warning: variable does not need to be mutable
+   --> src\main.rs:165:9
+    |
+165 |     let mut ram = vec![0; 0x200000];
+    |         ----^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable `PCtemp` should have a snake case name
+  --> src\main.rs:66:17
+   |
+66 |         let mut PCtemp = snes.cpu.PC;
+   |                 ^^^^^^ help: convert the identifier to snake case: `pctemp`
+   |
+   = note: `#[warn(non_snake_case)]` on by default
+
+warning: `snes` (bin "snes") generated 9 warnings (run `cargo fix --bin "snes"` to apply 8 suggestions)
+    Finished dev [unoptimized + debuginfo] target(s) in 0.86s
+     Running `target\debug\snes.exe .\super_metroid.sfc`
+ DEBUG snes::cartridge > Checksum F8DF and Complement 0720
+ DEBUG snes::cartridge > Found LoROM mode ROM
+ INFO  snes::cartridge > ROM is "Super Metroid"
+ DEBUG snes::cartridge > Rom speed is Fast
+ DEBUG snes::cartridge > Cartridge hardware: CartHardware { extra_hardware: RomRamBattery, coprocessor: None }
+ DEBUG snes::cartridge > ROM size: 4096kB, RAM size: 8kB
+ DEBUG snes::cartridge > Region: PAL
+ DEBUG snes::cartridge > Developer ID: 01
+ DEBUG snes::cartridge > Rom Version: 0
+ TRACE snes::memory    > Read #1878 from ROM at address $00841C
+ TRACE snes::memory    > Read #00 from RAM at address $001878
+ TRACE snes::memory    > Read #005C from ROM at address $008573

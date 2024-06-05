@@ -32,7 +32,9 @@ use symbols::scrollbar;
 #[derive(Debug, Default)]
 pub struct App {
     scroll_state: ScrollbarState,
-    stack_scroll: usize
+    stack_scroll: usize,
+    current_instr_context: Vec<String>,
+    current_instr_loc: usize,
 }
 
 #[derive(Debug)]
@@ -42,7 +44,8 @@ pub struct Console {
     ram: Vec<u8>
 }
 
-fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
+
+fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
     let size = f.size();
 
     let chunks = Layout::horizontal([
@@ -56,18 +59,35 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::ROUNDED);
+    
+    if app.current_instr_context.is_empty() {
+        let opcode = memory::read_byte(&snes, snes.cpu.PC)?;
+        let mut currinstr = cpu::decode_instruction(&snes, opcode)?;
+        let mut PCtemp = snes.cpu.PC;
+        app.current_instr_context.push(currinstr.to_string());
+        while !(currinstr.opcode.is_jump() || currinstr.opcode.is_interrupt()) || PCtemp > (snes.cpu.PC + 0x200) {
+            PCtemp += currinstr.mode.length(false, false) as u32;
+            let opcode = memory::read_byte(&snes, PCtemp)?;
+            currinstr = cpu::decode_instruction(&snes, opcode)?;
+            app.current_instr_context.push(currinstr.to_string());
+        }
+    }
 
-    let counter_text = 
-    Text::from(vec![
-        Line::raw("LDA #%00000001"),
-        Line::raw("STA $4015"),
-        Line::raw("LDA #%01010100"),
-        Line::styled("STA $4000", Style::new().on_green().black()),
-        Line::raw("LDA #$C9"),
-        Line::raw("STA $4002"),
-        Line::raw("LDA #%00010001"),
-        Line::raw("STA $4003"),
-        Line::raw("RTS")]);
+    let rendertext: Vec<Line> = app.current_instr_context
+        .iter()
+        .enumerate()
+        .map(|(i, f)| if i == app.current_instr_loc 
+            {Line::from(f.clone()).on_green().black()} else {Line::from(f.clone())})
+        .collect();
+
+    app.current_instr_loc += 1;
+
+    if app.current_instr_loc == app.current_instr_context.len()-1 {
+        app.current_instr_loc = 0;
+        app.current_instr_context.clear();
+    }
+        
+    let instr_text = Text::from(rendertext);
 
     let reg_text = Text::from(format!("{}", snes.cpu));
 
@@ -84,7 +104,7 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
 
     app.scroll_state = app.scroll_state.content_length(65536);
 
-    let instr_par = Paragraph::new(counter_text)
+    let instr_par = Paragraph::new(instr_text)
         .left_aligned()
         .block(block);
 
@@ -124,7 +144,7 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
         &mut app.scroll_state
     );
     f.render_widget(reg_par, chunks[2]);
-
+    return Ok(())
 }
 
 fn main() -> Result<()> {
@@ -151,14 +171,20 @@ fn main() -> Result<()> {
     };
     let reset = memory::read_word(&snes, snes.cartridge.header.interrupt_vectors.reset as u32)? as u32;
     snes.cpu.PC = reset;
-    let instr = memory::read_byte(&snes, reset)?;
+    let op = memory::read_byte(&snes, reset)?;
+    let instr = cpu::decode_instruction(&snes, op)?;
+    snes.cpu.PC = snes.cartridge.header.interrupt_vectors.brk as u32;
     
     let tick_rate = Duration::from_millis(100);
     let mut app = App::default();
+    app.current_instr_context = Vec::new();
     let mut last_tick = Instant::now();
-
+    let mut currpc = snes.cpu.PC+1;
     'mainloop: loop {
-        terminal.draw(|f| ui(f, &mut app, &snes))?;
+        if currpc != snes.cpu.PC {
+            currpc = snes.cpu.PC;
+            terminal.draw(|f| ui(f, &mut app, &snes).unwrap())?;
+        }
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {

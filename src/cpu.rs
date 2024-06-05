@@ -97,6 +97,40 @@ pub enum OpCode {
     XCE,
 }
 
+impl OpCode {
+    pub fn is_branch(&self) -> bool {
+        match self {
+            OpCode::BRA | OpCode::BCC | OpCode::BCS | OpCode::BEQ 
+            | OpCode::BMI | OpCode::BNE | OpCode::BPL | OpCode::BVC | OpCode::BVS => true,
+            _ => false
+        }
+    }
+    pub fn is_jump(&self) -> bool {
+        match self {
+            OpCode::JMP | OpCode::JSR | OpCode::JML | OpCode::JSL => true,
+            _ => false
+        }
+    }
+    pub fn is_interrupt(&self) -> bool {
+        match self {
+            OpCode::BRK | OpCode::COP  => true,
+            _ => false
+        }
+    }
+    pub fn is_subroutine(&self) -> bool {
+        match self {
+            OpCode::JML | OpCode::JSR => true,
+            _ => false
+        }
+    }
+    pub fn is_return(&self) -> bool {
+        match self {
+            OpCode::RTS | OpCode::RTI | OpCode::RTL => true,
+            _ => false
+        }
+    }
+}
+
 impl std::fmt::Display for OpCode {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -244,7 +278,7 @@ pub enum AddrMode {
 }
 
 impl AddrMode {
-    fn length(&self, m: bool, x: bool) -> usize {
+    pub fn length(&self, m: bool, x: bool) -> usize {
         match self {
             AddrMode::Absolute => 3,
             AddrMode::AbsoluteWord => 3,
@@ -428,11 +462,11 @@ impl std::fmt::Display for CPU {
 
 #[derive(Debug)]
 pub struct InstructionContext {
-    opcode: OpCode,
-    mode: AddrMode,
-    inst_addr: u32,
-    data_addr: u32,
-    cycles: u8,
+    pub opcode: OpCode,
+    pub mode: AddrMode,
+    pub inst_addr: u32,
+    pub data_addr: u32,
+    pub cycles: u8,
 }
 
 impl std::fmt::Display for InstructionContext {
@@ -532,7 +566,7 @@ fn execute_opcode(snes: &Console, instruction: OpCode, mode: AddrMode) -> Result
     Ok(())
 }
 
-pub fn decode_instruction(snes: &mut Console, instruction: u8) -> Result<InstructionContext> {
+pub fn decode_instruction(snes: &Console, instruction: u8) -> Result<InstructionContext> {
     let opcode = match instruction {
         0x00 => OpCode::BRK,
         0x01 | 0x03 | 0x05 | 0x07 | 0x09 | 0x0D | 0x0F | 0x11 | 0x12 | 0x13 | 0x15 | 0x17
