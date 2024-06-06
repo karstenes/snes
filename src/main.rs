@@ -179,7 +179,7 @@ fn main() -> Result<()> {
     let mut app = App::default();
     app.current_instr_context = Vec::new();
     let mut last_tick = Instant::now();
-    let mut currpc = snes.cpu.PC+1;
+    let mut currpc = 0;
     'mainloop: loop {
         if currpc != snes.cpu.PC {
             currpc = snes.cpu.PC;

@@ -1,5 +1,7 @@
+use std::ops::Add;
+
 use super::Console;
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, ensure, Ok, Result};
 
 #[derive(Debug)]
 pub enum OpCode {
@@ -388,7 +390,7 @@ pub struct CPU {
     /// Flags Register
     pub P: Flags,
     /// Program Counter (16 bit, but stored as 32 bits to speed up emulation)
-    pub PC: u32,
+    pub PC: u32
 }
 
 impl Flags {
@@ -553,17 +555,211 @@ pub fn decode_addressing_mode(opcode: u8) -> Result<AddrMode> {
     Ok(mode)
 }
 
-fn calculate_cycles(snes: &Console, opcode: &OpCode) -> Result<u8> {
-    Ok(0)
+fn calculate_cycles(snes: &Console, instruction: InstructionContext) -> Result<u8> {
+    let w = ((snes.cpu.D & 0xFF) > 1) as u8;
+    let p = (instruction.data_addr & 0xFF0000) >> 16 != (snes.cpu.PC & 0xFF0000) >> 16;
+    let m = snes.cpu.P.m as u8;
+    let cycles = match instruction.opcode {
+        OpCode::JMP | OpCode::JML => {
+            match instruction.mode {
+                AddrMode::Absolute => 3,
+                AddrMode::Long => 4,
+                AddrMode::AbsoluteIndirectWord => 5,
+                AddrMode::AbsoluteIndexedIndirect | AddrMode::AbsoluteIndirectSWord => 6,
+                _ => unreachable!()
+            }
+        },
+        OpCode::JSL | OpCode::JSR => {
+            match instruction.mode {
+                AddrMode::Long => 8,
+                AddrMode::Absolute => 6,
+                AddrMode::AbsoluteIndexedIndirect => 8,
+                _ => unreachable!()
+            }
+        }
+        OpCode::RTL | OpCode::RTS => 6,
+        OpCode::RTI => 7 - snes.cpu.P.e as u8,
+        OpCode::MVN | OpCode::MVP => 7,
+        OpCode::NOP | OpCode::WDM => 2,
+        OpCode::PEA => 5,
+        OpCode::PER => 6,
+        OpCode::PEI => 6 + w,
+        OpCode::ADC | OpCode::SBC => {
+            match instruction.mode {
+                AddrMode::IndexedDirectWord => 7 - m + w,
+                AddrMode::Stack => 5 - m,
+                AddrMode::Direct => 4 - m + w,
+                AddrMode::DirectSWord => 7 - m + w,
+                AddrMode::Immediate => 3 - m,
+                AddrMode::Absolute => 5 - m,
+                AddrMode::Long => 6 - m,
+                AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::DirectWord => 6 - m + w,
+                AddrMode::StackIndexed => 8 - m,
+                AddrMode::DirectX => 5 - m + w,
+                AddrMode::DirectIndexedSWord => 7 - m + w,
+                AddrMode::AbsoluteY | AddrMode::AbsoluteX => 6 - m - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::Long => 6 - m,
+                AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                _ => unreachable!()
+            }
+        },
+        OpCode::CMP => {
+            match instruction.mode {
+                AddrMode::IndexedDirectWord => 7 - m + w,
+                AddrMode::Stack => 5 - m,
+                AddrMode::Direct => 4 - m + w,
+                AddrMode::DirectSWord => 7 - m + w,
+                AddrMode::Immediate => 3 - m,
+                AddrMode::Absolute => 5 - m,
+                AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::DirectWord => 6 - m + w,
+                AddrMode::StackIndexed => 8 - m,
+                AddrMode::DirectX => 5 - m + w,
+                AddrMode::DirectIndexedSWord => 7 - m + w,
+                AddrMode::AbsoluteY | AddrMode::AbsoluteX => 6 - m - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::LongX => 6 - m,
+                _ => unreachable!()
+            }
+        },
+        OpCode::CPX | OpCode::CPY => {
+            match instruction.mode {
+                AddrMode::Immediate => 3 - snes.cpu.P.x as u8,
+                AddrMode::Direct => 4 - snes.cpu.P.x as u8 + w,
+                AddrMode::Absolute => 5 - snes.cpu.P.x as u8,
+                _ => unreachable!()
+            }
+        },
+        OpCode::DEC | OpCode::DEX | OpCode::DEY | OpCode::INC | OpCode::INX | OpCode::INY => {
+            match instruction.mode {
+                AddrMode::Accumulator => 2,
+                AddrMode::Direct => 7 - (2 * m) + w,
+                AddrMode::Absolute => 8 - (2 * m),
+                AddrMode::DirectX => 8 - (2 * m) + w,
+                AddrMode::AbsoluteX => 9 - (2 * m),
+                AddrMode::Implied => 2,
+                _ => unreachable!()
+            }
+        },
+        OpCode::AND | OpCode::EOR | OpCode::ORA => {
+            match instruction.mode {
+                AddrMode::IndexedDirectWord => 7 - m + w,
+                AddrMode::Stack => 5 - m,
+                AddrMode::Direct => 4 - m + w,
+                AddrMode::DirectSWord => 7 - m + w,
+                AddrMode::Immediate => 3 - m,
+                AddrMode::Absolute => 5 - m,
+                AddrMode::Long => 6 - m,
+                AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::DirectWord => 6 - m + w,
+                AddrMode::StackIndexed => 8 - m,
+                AddrMode::DirectX => 5 - m + w,
+                AddrMode::DirectIndexedSWord => 7 - m + w,
+                AddrMode::AbsoluteY | AddrMode::AbsoluteX => 6 - m - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::LongX => 6 - m,
+                _ => unreachable!()
+            }
+        },
+        OpCode::BIT => {
+            match instruction.mode {
+                AddrMode::Direct => 4 - m + w,
+                AddrMode::Absolute => 5 - m,
+                AddrMode::DirectX => 5 - m + w,
+                AddrMode::AbsoluteX => 6 - m - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::Immediate => 3 - m,
+                _ => unreachable!() 
+            }
+        },
+        OpCode::TRB | OpCode::TSB => {
+            match instruction.mode {
+                AddrMode::Direct => 7 - (2 * m) + w,
+                AddrMode::Absolute => 8 - (2 * m),
+                _ => unreachable!()
+            }
+        },
+        OpCode::ASL | OpCode::LSR | OpCode::ROL | OpCode::ROR => {
+            match instruction.mode {
+                AddrMode::Direct => 7 - (2 * m) + w,
+                AddrMode::Accumulator => 2,
+                AddrMode::Absolute => 8 - (2 * m),
+                AddrMode::DirectX => 8 - (2 * m) + w,
+                AddrMode::AbsoluteX => 9 - (2 * m),
+                _ => unreachable!()
+            }
+        },
+        OpCode::BRA => 3 + (snes.cpu.P.e || p) as u8,
+        OpCode::BCC => 2 + (!snes.cpu.P.c as u8) + (!snes.cpu.P.c || snes.cpu.P.e || p) as u8,
+        OpCode::BCS => 2 + (snes.cpu.P.c as u8) + (snes.cpu.P.c || snes.cpu.P.e || p) as u8,
+        OpCode::BEQ => 2 + (snes.cpu.P.z as u8) + (snes.cpu.P.z || snes.cpu.P.e || p) as u8,
+        OpCode::BMI => 2 + (snes.cpu.P.n as u8) + (snes.cpu.P.n || snes.cpu.P.e || p) as u8,
+        OpCode::BNE => 2 + (!snes.cpu.P.n as u8) + (!snes.cpu.P.n || snes.cpu.P.e || p) as u8,
+        OpCode::BPL => 2 + (!snes.cpu.P.z as u8) + (!snes.cpu.P.z || snes.cpu.P.e || p) as u8,
+        OpCode::BVC => 2 + (snes.cpu.P.v as u8) + (snes.cpu.P.v || snes.cpu.P.e || p) as u8,
+        OpCode::BVS => 2 + (!snes.cpu.P.v as u8) + (!snes.cpu.P.v || snes.cpu.P.e || p) as u8,
+        OpCode::BRL => 4,
+        OpCode::BRK | OpCode::COP => 8 - snes.cpu.P.e as u8,
+        OpCode::CLC | OpCode::CLD | OpCode::CLI | OpCode::CLV 
+        | OpCode::SEC | OpCode::SED | OpCode::SEI => 2,
+        OpCode::REP | OpCode::SEP => 3,
+        OpCode::LDA | OpCode::STA => {
+            match instruction.mode {
+                AddrMode::IndexedDirectWord => 7 - m + w,
+                AddrMode::Stack => 5 - m,
+                AddrMode::Direct => 4 - m + w,
+                AddrMode::DirectSWord => 7 - m + w,
+                AddrMode::Immediate => 3 - m,
+                AddrMode::Absolute => 5 - m,
+                AddrMode::Long => 6 - m,
+                AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::DirectWord => 6 - m + w,
+                AddrMode::StackIndexed => 8 - m,
+                AddrMode::DirectX => 5 - m + w,
+                AddrMode::DirectIndexedSWord => 7 - m + w,
+                AddrMode::AbsoluteY | AddrMode::AbsoluteX => 6 - m - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                AddrMode::Long => 6 - m,
+                AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
+                _ => unreachable!()
+            }
+        },
+        OpCode::LDX | OpCode::LDY | OpCode::STX | OpCode::STY => {
+            match instruction.mode {
+                AddrMode::Immediate => 3 - snes.cpu.P.x as u8,
+                AddrMode::Direct => 4 - snes.cpu.P.x as u8 + w,
+                AddrMode::Absolute => 5 - snes.cpu.P.x as u8,
+                AddrMode::DirectY | AddrMode::DirectX => 5 - snes.cpu.P.x as u8 + w,
+                AddrMode::AbsoluteY | AddrMode::AbsoluteX => 6 - (2 * snes.cpu.P.x as u8) + (snes.cpu.P.x || p) as u8,
+                _ => unreachable!()
+            }
+        },        
+        OpCode::STZ => {
+            match instruction.mode {
+                AddrMode::Direct => 4 - m + w,
+                AddrMode::DirectX => 5 - m + w,
+                AddrMode::Absolute => 5 - m,
+                AddrMode::AbsoluteX => 6 - m,
+                _ => unreachable!()
+            }
+        },
+        OpCode::MVN | OpCode::MVP => 7,
+        OpCode::PHA => 4 - m,
+        OpCode::PHX | OpCode::PHY => 4 - snes.cpu.P.x as u8,
+        OpCode::PLA => 5 - m,
+        OpCode::PLX | OpCode::PLY => 5 - snes.cpu.P.x as u8,
+        OpCode::PHB | OpCode::PHK | OpCode::PHP => 3,
+        OpCode::PHD | OpCode::PLB | OpCode::PLP => 4,
+        OpCode::PLD => 5,
+        OpCode::STP | OpCode::WAI => 3,
+        OpCode::TAX | OpCode::TAY | OpCode::TSX | OpCode::TXA 
+        | OpCode::TXS | OpCode::TXY | OpCode::TYA | OpCode::TYX
+        | OpCode::TCD | OpCode::TCS | OpCode::TDC | OpCode::TSC => 2,
+        OpCode::XBA => 3,
+        OpCode::XCE => 2
+    };
+    Ok(cycles)
 }
 
 fn calculate_address(snes: &Console, mode: &AddrMode) -> Result<u32> {
-    // TODO Implement Address Calculations
-    Ok(0)
-}
-
-fn execute_opcode(snes: &Console, instruction: OpCode, mode: AddrMode) -> Result<()> {
-    Ok(())
+    todo!("Implement Address Calculations")
 }
 
 pub fn decode_instruction(snes: &Console, instruction: u8) -> Result<InstructionContext> {
@@ -680,6 +876,10 @@ pub fn decode_instruction(snes: &Console, instruction: u8) -> Result<Instruction
         data_addr: address,
         cycles,
     })
+}
+
+fn execute_instruction(snes: &mut Console, instruction: InstructionContext) {
+
 }
 
 #[cfg(test)]
