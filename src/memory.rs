@@ -182,15 +182,70 @@ fn read_rom_byte(rom: &cartridge::Cartridge, addr: u32) -> Result<u8> {
     }
 }
 
+pub fn write_word(snes: &mut Console, addr: u32, data: u16) -> Result<()> {
+    let bank = (addr & 0xFF0000) >> 16;
+    let addr_word = addr & 0xFFFF;
+    match addr {
+        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+            || bank >= 0xC0
+            || (bank >= 0x40 && bank < 0x7E) =>
+        {
+            bail!("Attemped to write {:04X} to ROM at {:06X}", data, addr)
+        }
+        addr if (bank >= 0x7E && bank < 0x80)
+            || ((bank < 0x40 || (bank >= 0x80 && bank < 0xC0)) && addr_word < 0x2000) =>
+        {
+            write_ram_word(&mut snes.ram, addr, data)
+        }
+        _ => {
+            bail!("Memory access error! Tried to access {:06X}", addr)
+        }
+    }
+}
+
+pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
+    let bank = (addr & 0xFF0000) >> 16;
+    let addr_word = addr & 0xFFFF;
+    match addr {
+        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+            || bank >= 0xC0
+            || (bank >= 0x40 && bank < 0x7E) =>
+        {
+            bail!("Attemped to write {:02X} to ROM at {:06X}", data, addr)
+        }
+        addr if (bank >= 0x7E && bank < 0x80)
+            || ((bank < 0x40 || (bank >= 0x80 && bank < 0xC0)) && addr_word < 0x2000) =>
+        {
+            write_ram_byte(&mut snes.ram, addr, data)
+        }
+        _ => {
+            bail!("Memory access error! Tried to access {:06X}", addr)
+        }
+    }
+}
+
+
 fn write_ram_word(ram: &mut Vec<u8>, addr: u32, val: u16) -> Result<()> {
     let ram_addr: usize = (addr & 0x200000) as usize;
     ensure!(
         ram_addr <= 0x200000,
-        "Attemped to read RAM at address ${:04X}, which is out of bounds.",
+        "Attemped to write RAM at address ${:04X}, which is out of bounds.",
         addr
     );
     trace!("Writing #{:04X} to RAM at address ${:06X}", val, addr);
     ram[(addr & 0x1FFFF) as usize] = (val & 0xFF) as u8;
     ram[((addr & 0x1FFFF) + 1) as usize] = ((val & 0xFF00) >> 8) as u8;
+    Ok(())
+}
+
+fn write_ram_byte(ram: &mut Vec<u8>, addr: u32, val: u8) -> Result<()> {
+    let ram_addr: usize = (addr & 0x200000) as usize;
+    ensure!(
+        ram_addr <= 0x200000,
+        "Attemped to write RAM at address ${:04X}, which is out of bounds.",
+        addr
+    );
+    trace!("Writing #{:02X} to RAM at address ${:06X}", val, addr);
+    ram[(addr & 0x1FFFF) as usize] = val;
     Ok(())
 }

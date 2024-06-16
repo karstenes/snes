@@ -32,9 +32,10 @@ use symbols::scrollbar;
 #[derive(Debug, Default)]
 pub struct App {
     scroll_state: ScrollbarState,
-    stack_scroll: usize,
+    stack_scroll: u16,
     current_instr_context: Vec<String>,
     current_instr_loc: usize,
+    current_pc: u32
 }
 
 #[derive(Debug)]
@@ -61,11 +62,11 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
         .border_set(border::ROUNDED);
     
     if app.current_instr_context.is_empty() {
-        let opcode = memory::read_byte(&snes, snes.cpu.PC)?;
+        let opcode = memory::read_byte(&snes, snes.cpu.get_pc())?;
         let mut currinstr = cpu::decode_instruction(&snes, opcode)?;
-        let mut PCtemp = snes.cpu.PC;
+        let mut PCtemp = snes.cpu.get_pc();
         app.current_instr_context.push(currinstr.to_string());
-        while !(currinstr.opcode.is_jump() || currinstr.opcode.is_interrupt()) || PCtemp > (snes.cpu.PC + 0x200) {
+        while !(currinstr.opcode.is_jump() || currinstr.opcode.is_interrupt()) || PCtemp > (snes.cpu.get_pc() + 0x200) {
             PCtemp += currinstr.mode.length(false, false) as u32;
             let opcode = memory::read_byte(&snes, PCtemp)?;
             currinstr = cpu::decode_instruction(&snes, opcode)?;
@@ -80,7 +81,9 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
             {Line::from(f.clone()).on_green().black()} else {Line::from(f.clone())})
         .collect();
 
-    app.current_instr_loc += 1;
+    if app.current_pc != snes.cpu.get_pc() {
+        app.current_instr_loc += 1;
+    }
 
     if app.current_instr_loc == app.current_instr_context.len()-1 {
         app.current_instr_loc = 0;
@@ -91,9 +94,10 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
 
     let reg_text = Text::from(format!("{}", snes.cpu));
 
-    let stack: Vec<Line> = snes.ram[0x010000..=0x01FFFF].iter()
+    let stack: Vec<Line> = snes.ram[0x000000..=0x00FFFF].iter()
         .enumerate()
-        .map(|x| if x.0 == snes.cpu.S as usize {
+        .map(|x| if ((x.0 == snes.cpu.S as usize) && !snes.cpu.P.e) 
+            || ((x.0 == ((snes.cpu.S & 0x00FF) | 0x0100) as usize) && snes.cpu.P.e) {
             Line::from(format!("{:04X}: {:02X}", x.0, x.1)).on_green().black()
         } else {
             Line::from(format!("{:04X}: {:02X}", x.0, x.1))
@@ -102,7 +106,9 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
 
     let stack_text = Text::from(stack);
 
-    app.scroll_state = app.scroll_state.content_length(65536);
+    app.scroll_state = app.scroll_state
+        .content_length(65536)
+        .position((app.stack_scroll % 0xFFFF) as usize);
 
     let instr_par = Paragraph::new(instr_text)
         .left_aligned()
@@ -170,26 +176,42 @@ fn main() -> Result<()> {
         ram
     };
     let reset = memory::read_word(&snes, snes.cartridge.header.interrupt_vectors.reset as u32)? as u32;
-    snes.cpu.PC = reset;
-    let op = memory::read_byte(&snes, reset)?;
+    snes.cpu.PC = (reset & 0xFFFF) as u16;
+    let op = memory::read_byte(&snes, snes.cpu.get_pc())?;
     let instr = cpu::decode_instruction(&snes, op)?;
-    snes.cpu.PC = snes.cartridge.header.interrupt_vectors.brk as u32;
+    cpu::execute_instruction(&mut snes, instr)?;
     
     let tick_rate = Duration::from_millis(100);
     let mut app = App::default();
     app.current_instr_context = Vec::new();
+    app.current_pc = snes.cpu.get_pc();
     let mut last_tick = Instant::now();
-    let mut currpc = 0;
     'mainloop: loop {
-        if currpc != snes.cpu.PC {
-            currpc = snes.cpu.PC;
-            terminal.draw(|f| ui(f, &mut app, &snes).unwrap())?;
-        }
+        terminal.draw(|f| ui(f, &mut app, &snes).unwrap())?;
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => break 'mainloop,
+                    KeyCode::Up => {
+                        app.stack_scroll = app.stack_scroll.wrapping_sub(1);
+                    },
+                    KeyCode::Down => {
+                        app.stack_scroll = app.stack_scroll.wrapping_add(1);
+                    },
+                    KeyCode::PageUp => {
+                        app.stack_scroll = app.stack_scroll.wrapping_sub(0x10);
+                    },
+                    KeyCode::PageDown => {
+                        app.stack_scroll = app.stack_scroll.wrapping_add(0x10);
+                    }
+                    KeyCode::Enter => {
+                        if snes.cpu.P.e {
+                            app.stack_scroll = snes.cpu.S.to_le_bytes()[0] as u16 | 0x0100;
+                        } else {
+                            app.stack_scroll = snes.cpu.S;
+                        }
+                    },
                     _ => {}
                 }
             }

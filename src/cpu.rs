@@ -1,9 +1,23 @@
-use std::ops::Add;
+use crate::memory;
 
 use super::Console;
 use anyhow::{bail, ensure, Ok, Result};
+use log::trace;
 
-#[derive(Debug)]
+const OLD_OPCODES: Vec<OpCode> = vec![OpCode::LDA, OpCode::LDX, OpCode::LDY,
+OpCode::STA, OpCode::STX, OpCode::STY, OpCode::STZ, OpCode::PHA, OpCode::PHX,
+OpCode::PHY, OpCode::PHP, OpCode::PLA, OpCode::PLX, OpCode::PLY, OpCode::PLP,
+OpCode::TSX, OpCode::TXS, OpCode::INX, OpCode::INY, OpCode::DEX, OpCode::DEY,
+OpCode::INC, OpCode::DEC, OpCode::ASL, OpCode::LSR, OpCode::ROL, OpCode::ROR,
+OpCode::AND, OpCode::ORA, OpCode::EOR, OpCode::BIT, OpCode::CMP, OpCode::CPX,
+OpCode::CPY, OpCode::TRB, OpCode::TSB, OpCode::ADC, OpCode::SBC, OpCode::JMP,
+OpCode::JSR, OpCode::RTS, OpCode::RTI, OpCode::BRA, OpCode::BEQ, OpCode::BNE,
+OpCode::BCC, OpCode::BCS, OpCode::BVC, OpCode::BVS, OpCode::BMI, OpCode::BPL,
+OpCode::CLC, OpCode::CLD, OpCode::CLI, OpCode::CLV, OpCode::SEC, OpCode::SED,
+OpCode::SEI, OpCode::TAX, OpCode::TAY, OpCode::TXA, OpCode::TYA, OpCode::NOP,
+OpCode::BRK, OpCode::PEI];
+
+#[derive(Debug, PartialEq)]
 pub enum OpCode {
     ADC,
     AND,
@@ -130,6 +144,9 @@ impl OpCode {
             OpCode::RTS | OpCode::RTI | OpCode::RTL => true,
             _ => false
         }
+    }
+    pub fn is_old(&self) -> bool {
+        OLD_OPCODES.contains(self)
     }
 }
 
@@ -364,7 +381,7 @@ pub struct Flags {
     /// Carry
     c: bool,
     /// Emulation mode
-    e: bool,
+    pub e: bool,
     /// Break
     b: bool,
 }
@@ -382,15 +399,15 @@ pub struct CPU {
     /// Stack Pointer (16 bit)
     pub S: u16,
     /// Databank Register (16 bit)
-    pub DBR: u16,
+    pub DBR: u8,
     /// Direct Addressing Register (16 bit)
     pub D: u16,
-    /// Program Bank Register (8 bit, but stored as 32 bits to speed up emulation)
-    pub K: u32,
+    /// Program Bank Register (8 bit)
+    pub K: u8,
     /// Flags Register
     pub P: Flags,
-    /// Program Counter (16 bit, but stored as 32 bits to speed up emulation)
-    pub PC: u32
+    /// Program Counter (16 bit)
+    pub PC: u16
 }
 
 impl Flags {
@@ -404,7 +421,7 @@ impl Flags {
             i: false,
             z: false,
             c: false,
-            e: false,
+            e: true,
             b: false,
         }
     }
@@ -443,12 +460,16 @@ impl CPU {
             PC: 0,
         }
     }
+
+    pub fn get_pc(&self) -> u32 {
+        self.PC as u32 | (self.K as u32) << 16
+    }
 }
 
 impl std::fmt::Display for CPU {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "A:   {:04X}\nX:   {:04X}\nY:   {:04X}\nS:   {:04X}\nDBR: {:04X}\nD:   {:04X}\nK:   {:04X}\nP:   {}\nPC:  ${:06X}", 
+        write!(f, "A:   {:04X}\nX:   {:04X}\nY:   {:04X}\nS:   {:04X}\nDBR: {:04X}\nD:   {:04X}\nK:   {:02X}\nP:   {}\nPC:  ${:04X}", 
             self.A,
             self.X,
             self.Y,
@@ -467,8 +488,7 @@ pub struct InstructionContext {
     pub opcode: OpCode,
     pub mode: AddrMode,
     pub inst_addr: u32,
-    pub data_addr: u32,
-    pub cycles: u8,
+    pub data_addr: u32
 }
 
 impl std::fmt::Display for InstructionContext {
@@ -557,7 +577,7 @@ pub fn decode_addressing_mode(opcode: u8) -> Result<AddrMode> {
 
 fn calculate_cycles(snes: &Console, instruction: InstructionContext) -> Result<u8> {
     let w = ((snes.cpu.D & 0xFF) > 1) as u8;
-    let p = (instruction.data_addr & 0xFF0000) >> 16 != (snes.cpu.PC & 0xFF0000) >> 16;
+    let p = ((instruction.data_addr & 0xFF0000) >> 16) as u8 != snes.cpu.K;
     let m = snes.cpu.P.m as u8;
     let cycles = match instruction.opcode {
         OpCode::JMP | OpCode::JML => {
@@ -740,7 +760,6 @@ fn calculate_cycles(snes: &Console, instruction: InstructionContext) -> Result<u
                 _ => unreachable!()
             }
         },
-        OpCode::MVN | OpCode::MVP => 7,
         OpCode::PHA => 4 - m,
         OpCode::PHX | OpCode::PHY => 4 - snes.cpu.P.x as u8,
         OpCode::PLA => 5 - m,
@@ -758,8 +777,137 @@ fn calculate_cycles(snes: &Console, instruction: InstructionContext) -> Result<u
     Ok(cycles)
 }
 
-fn calculate_address(snes: &Console, mode: &AddrMode) -> Result<u32> {
-    todo!("Implement Address Calculations")
+fn calculate_address(snes: &Console, op: &OpCode, mode: &AddrMode) -> Result<u32> {
+    let l = memory::read_byte(snes, snes.cpu.get_pc()+1)? as u32;
+    let h = memory::read_byte(snes, snes.cpu.get_pc()+2)? as u32;
+    let addr = match mode {
+        AddrMode::Absolute => {
+            if op.is_jump() {
+                ((snes.cpu.K as u32) << 16) | h << 8 | l
+            } else {
+                ((snes.cpu.DBR as u32) << 16) | h << 8 | l
+            }
+        },
+        AddrMode::AbsoluteWord => {
+            h << 8 | l
+        },
+        AddrMode::AbsoluteSWord => {
+            h << 8 | l
+        },
+        AddrMode::AbsoluteX => {
+            let refaddr = ((snes.cpu.DBR as u32) << 16) | h << 8 | l;
+            refaddr + snes.cpu.X as u32
+        },
+        AddrMode::AbsoluteY => {
+            let refaddr = ((snes.cpu.DBR as u32) << 16) | h << 8 | l;
+            refaddr + snes.cpu.Y as u32
+        },
+        AddrMode::AbsoluteIndirectWord => todo!(),
+        AddrMode::AbsoluteIndirectSWord => todo!(),
+        AddrMode::AbsoluteIndexedIndirect => {
+           let refaddr = ((snes.cpu.K as u32) << 16) | h << 8 | l;
+           refaddr + snes.cpu.X as u32
+        },
+        AddrMode::Accumulator => snes.cpu.get_pc(),
+        AddrMode::Direct => {
+            if snes.cpu.P.e && (snes.cpu.D & 0xFF) == 0x00 && op.is_old() {
+                ((snes.cpu.D & 0xFF00) as u32) >> 8 | l
+            } else {
+                (snes.cpu.D as u32) + l
+            }
+        },
+        AddrMode::DirectX => {
+            if snes.cpu.P.e && (snes.cpu.D & 0xFF) == 0x00 {
+                let templ = (snes.cpu.X as u8).wrapping_add(l as u8);
+                ((snes.cpu.D & 0xFF00) as u32) >> 8 | templ as u32
+            } else {
+                (snes.cpu.D as u32) + l + snes.cpu.X as u32
+            }
+        },
+        AddrMode::DirectY => {
+            if snes.cpu.P.e && (snes.cpu.D & 0xFF) == 0x00 {
+                let templ = (snes.cpu.Y as u8).wrapping_add(l as u8);
+                ((snes.cpu.D & 0xFF00) as u32) >> 8 | templ as u32
+            } else {
+                (snes.cpu.D as u32) + l + snes.cpu.Y as u32
+            }
+        },
+        AddrMode::DirectWord => {
+            if snes.cpu.P.e && (snes.cpu.D & 0xFF) == 0x00 {
+                let temp_addr = ((snes.cpu.D & 0xFF00) as u32) >> 8 | l;
+                let pointer = memory::read_word(snes, temp_addr)?;
+                (snes.cpu.DBR as u32) << 16 | pointer as u32
+            } else {
+                let temp_addr = (snes.cpu.D as u32) + l;
+                let pointer = memory::read_word(snes, temp_addr)?;
+                (snes.cpu.DBR as u32) << 16 | pointer as u32
+            }
+        },
+        AddrMode::DirectSWord => {
+            let temp_addr = (snes.cpu.D as u32) + l;
+            let pointer = memory::read_word(snes, temp_addr)?;
+            (snes.cpu.DBR as u32) << 16 | pointer as u32
+        },
+        AddrMode::IndexedDirectWord => {
+            if snes.cpu.P.e && (snes.cpu.D & 0xFF) == 0x00 {
+                let temp_addr = ((snes.cpu.D & 0xFF00) as u32) >> 8 | l;
+                let pointer = memory::read_word(snes, temp_addr.wrapping_add(snes.cpu.X as u32))?;
+                (snes.cpu.DBR as u32) << 16 | pointer as u32
+            } else {
+                let temp_addr = (snes.cpu.D as u32) + l;
+                let pointer = memory::read_word(snes, temp_addr.wrapping_add(snes.cpu.X as u32))?;
+                (snes.cpu.DBR as u32) << 16 | pointer as u32
+            }
+        },
+        AddrMode::DirectIndexedWord => {
+            if snes.cpu.P.e && (snes.cpu.D & 0xFF) == 0x00 {
+                let temp_addr = ((snes.cpu.D & 0xFF00) as u32) >> 8 | l;
+                let pointer = memory::read_word(snes, temp_addr)?;
+                let temp_data_addr = (snes.cpu.DBR as u32) << 16 | pointer as u32;
+                temp_data_addr.wrapping_add(snes.cpu.Y as u32)
+            } else {
+                let temp_addr = (snes.cpu.D as u32) + l;
+                let pointer = memory::read_word(snes, temp_addr)?;
+                let temp_data_addr = (snes.cpu.DBR as u32) << 16 | pointer as u32;
+                temp_data_addr.wrapping_add(snes.cpu.Y as u32)
+            }
+        },
+        AddrMode::DirectIndexedSWord => {
+            let temp_addr = (snes.cpu.D as u32) + l;
+            let pointer_lo = memory::read_byte(snes, temp_addr)?;
+            let pointer_mid = memory::read_byte(snes, temp_addr+1)?;
+            let pointer_hi = memory::read_byte(snes, temp_addr+2)?;
+            let temp_data_addr = u32::from_be_bytes([0x00, pointer_hi, pointer_mid, pointer_lo]);
+            temp_data_addr.wrapping_add(snes.cpu.Y as u32)
+        },
+        AddrMode::Immediate => snes.cpu.get_pc()+1,
+        AddrMode::Implied => snes.cpu.get_pc(),
+        AddrMode::Long => {
+            let hh = memory::read_byte(snes, snes.cpu.get_pc()+3)?;
+            u32::from_be_bytes([0x00, hh, h as u8, l as u8])
+        },
+        AddrMode::LongX => {
+            let hh = memory::read_byte(snes, snes.cpu.get_pc()+3)?;
+            let temp = u32::from_be_bytes([0x00, hh, h as u8, l as u8]);
+            temp + snes.cpu.X as u32
+        },
+        AddrMode::RelativeByte => {
+            let temp = if l <= 0x7F {
+                snes.cpu.PC + 2 + l as u16
+            } else {
+                snes.cpu.PC - 254 + l as u16
+            }.to_be_bytes();
+            u32::from_be_bytes([0x00, snes.cpu.K, temp[0], temp[1]])
+        },
+        AddrMode::RelativeWord => {
+            let temp = snes.cpu.PC.wrapping_add(3).wrapping_add(u16::from_be_bytes([h,l])).to_be_bytes();
+            u32::from_be_bytes([0x00, snes.cpu.K, temp[0], temp[1]])
+        },
+        AddrMode::SourceDestination => todo!(),
+        AddrMode::Stack => todo!(),
+        AddrMode::StackIndexed => todo!(),
+    }
+    Ok(addr)
 }
 
 pub fn decode_instruction(snes: &Console, instruction: u8) -> Result<InstructionContext> {
@@ -866,20 +1014,140 @@ pub fn decode_instruction(snes: &Console, instruction: u8) -> Result<Instruction
         0xFB => OpCode::XCE,
     };
     let mode = decode_addressing_mode(instruction)?;
-    let address = calculate_address(&snes, &mode)?;
-    let cycles = calculate_cycles(&snes, &opcode)?;
+    let address = calculate_address(&snes, &opcode, &mode)?;
 
     Ok(InstructionContext {
         opcode,
         mode,
-        inst_addr: snes.cpu.PC,
+        inst_addr: snes.cpu.get_pc(),
         data_addr: address,
-        cycles,
     })
 }
 
-fn execute_instruction(snes: &mut Console, instruction: InstructionContext) {
+fn push_byte(snes: &mut Console, data: u8) -> Result<()> {
+    match snes.cpu.P.e {
+        true => {
+            let mut sl = (snes.cpu.S & 0xFF) as u8;
+            memory::write_byte(snes, 0x000100 | sl as u32, data)?;
+            sl = sl.wrapping_sub(1);
+            snes.cpu.S &= 0xFF00;
+            snes.cpu.S |= sl as u16;
+        },
+        false => {
+            memory::write_byte(snes, snes.cpu.S as u32, data)?;
+            snes.cpu.S = snes.cpu.S.wrapping_sub(1);
+        }
+    }
+    Ok(())
+}
 
+fn pull_byte(snes: &mut Console) -> Result<u8> {
+    match snes.cpu.P.e {
+        true => {
+            let mut sl = (snes.cpu.S & 0xFF) as u8;
+            sl = sl.wrapping_add(1);
+            snes.cpu.S &= 0xFF00;
+            snes.cpu.S |= sl as u16;
+            memory::read_byte(snes, 0x000100 | sl as u32)
+        },
+        false => {
+            snes.cpu.S = snes.cpu.S.wrapping_add(1);
+            memory::read_byte(snes, snes.cpu.S as u32)
+        }
+    }
+}
+
+fn push_word(snes: &mut Console, data: u16) -> Result<()> {
+    let datal = (data & 0xFF) as u8;
+    let datah = ((data & 0xFF00) >> 8) as u8;
+    match snes.cpu.P.e {
+        true => {
+            let mut sl = (snes.cpu.S & 0xFF) as u8;
+            memory::write_byte(snes, 0x000100 | sl as u32, datah)?;
+            sl = sl.wrapping_sub(1);
+            memory::write_byte(snes, 0x000100 | sl as u32, datal)?;
+            sl = sl.wrapping_sub(1);
+            snes.cpu.S &= 0xFF00;
+            snes.cpu.S |= sl as u16;
+        },
+        false => {
+            memory::write_byte(snes, snes.cpu.S as u32, datah)?;
+            snes.cpu.S = snes.cpu.S.wrapping_sub(1);
+            memory::write_byte(snes, snes.cpu.S as u32, datal)?;
+            snes.cpu.S = snes.cpu.S.wrapping_sub(1);
+        }
+    }
+    Ok(())
+}
+
+fn pull_word(snes: &mut Console) -> Result<u16> {
+    match snes.cpu.P.e {
+        true => {
+            let mut sl = (snes.cpu.S & 0xFF) as u8;
+            sl = sl.wrapping_add(1);
+            let datal = memory::read_byte(snes, 0x000100 | sl as u32)?;
+            sl = sl.wrapping_add(1);
+            let datah = memory::read_byte(snes, 0x000100 | sl as u32)?;
+            snes.cpu.S &= 0xFF00;
+            snes.cpu.S |= sl as u16;
+            Ok(u16::from_be_bytes([datah, datal]))
+        },
+        false => {
+            snes.cpu.S = snes.cpu.S.wrapping_add(1);
+            let datal = memory::read_byte(snes, snes.cpu.S as u32)?;
+            snes.cpu.S = snes.cpu.S.wrapping_add(1);
+            let datah = memory::read_byte(snes, snes.cpu.S as u32)?;
+            Ok(u16::from_be_bytes([datah, datal]))
+        }
+    }
+}
+
+fn push_sword(snes: &mut Console, data: u32) -> Result<()> {
+    let databytes = data.to_le_bytes();
+    memory::write_byte(snes, snes.cpu.S as u32, databytes[1])?;
+    snes.cpu.S = snes.cpu.S.wrapping_sub(1);
+    memory::write_byte(snes, snes.cpu.S as u32, databytes[2])?;
+    snes.cpu.S = snes.cpu.S.wrapping_sub(1);
+    memory::write_byte(snes, snes.cpu.S as u32, databytes[3])?;
+    snes.cpu.S = snes.cpu.S.wrapping_sub(1);
+    Ok(())
+}
+
+fn pull_sword(snes: &mut Console) -> Result<u32> {
+    snes.cpu.S = snes.cpu.S.wrapping_add(1);
+    let datal = memory::read_byte(snes, snes.cpu.S as u32)?;
+    snes.cpu.S = snes.cpu.S.wrapping_add(1);
+    let datam = memory::read_byte(snes, snes.cpu.S as u32)?;
+    snes.cpu.S = snes.cpu.S.wrapping_add(1);
+    let datah = memory::read_byte(snes, snes.cpu.S as u32)?;
+    Ok(u32::from_be_bytes([0x00, datah, datam, datal]))
+}
+
+fn execute_instruction_emu(snes: &mut Console, instruction: InstructionContext) -> Result<()> {
+    trace!("Executing {} in emu mode", instruction.opcode);
+    match instruction.opcode {
+        OpCode::BRK => {
+            push_byte(snes, snes.cpu.K)?;
+            push_word(snes, (instruction.inst_addr & 0xFF) as u16 + 2)?;
+            snes.cpu.K = 0;
+            snes.cpu.PC = snes.cartridge.header.interrupt_vectors.brk;
+        }
+        _ => todo!("Implement remaining instructions")
+    }
+    Ok(())
+}
+
+pub fn execute_instruction(snes: &mut Console, instruction: InstructionContext) -> Result<()> {
+    if snes.cpu.P.e {
+        return execute_instruction_emu(snes, instruction);
+    }
+    match instruction.opcode {
+        OpCode::BRK => {
+            todo!("")
+        }
+        _ => todo!("Implement remaining instructions")
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -891,7 +1159,7 @@ mod tests {
         for x in 0..=0xFF {
             let addrmode = decode_addressing_mode(x);
             match addrmode {
-                Ok(_) => assert!(true),
+                Result::Ok(_) => assert!(true),
                 Err(_) => {
                     assert!(false, "{:02X}: {:?}", x, addrmode);
                 }
