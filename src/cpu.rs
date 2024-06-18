@@ -4,7 +4,7 @@ use super::Console;
 use anyhow::{bail, ensure, Ok, Result};
 use log::trace;
 
-const OLD_OPCODES: Vec<OpCode> = vec![OpCode::LDA, OpCode::LDX, OpCode::LDY,
+const OLD_OPCODES: [OpCode; 65] = [OpCode::LDA, OpCode::LDX, OpCode::LDY,
 OpCode::STA, OpCode::STX, OpCode::STY, OpCode::STZ, OpCode::PHA, OpCode::PHX,
 OpCode::PHY, OpCode::PHP, OpCode::PLA, OpCode::PLX, OpCode::PLY, OpCode::PLP,
 OpCode::TSX, OpCode::TXS, OpCode::INX, OpCode::INY, OpCode::DEX, OpCode::DEY,
@@ -900,13 +900,13 @@ fn calculate_address(snes: &Console, op: &OpCode, mode: &AddrMode) -> Result<u32
             u32::from_be_bytes([0x00, snes.cpu.K, temp[0], temp[1]])
         },
         AddrMode::RelativeWord => {
-            let temp = snes.cpu.PC.wrapping_add(3).wrapping_add(u16::from_be_bytes([h,l])).to_be_bytes();
+            let temp = snes.cpu.PC.wrapping_add(3).wrapping_add(u16::from_be_bytes([h as u8,l as u8])).to_be_bytes();
             u32::from_be_bytes([0x00, snes.cpu.K, temp[0], temp[1]])
         },
         AddrMode::SourceDestination => todo!(),
         AddrMode::Stack => todo!(),
         AddrMode::StackIndexed => todo!(),
-    }
+    };
     Ok(addr)
 }
 

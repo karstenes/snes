@@ -60,8 +60,8 @@ pub struct CartHardware {
 #[derive(TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum Region {
-    PAL,
-    NTSC
+    NTSC,
+    PAL
 }
 
 #[derive(Debug)]
