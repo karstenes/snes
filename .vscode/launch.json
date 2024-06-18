@@ -22,7 +22,7 @@
             "env": {
                 "RUST_LOG": "TRACE"
             },
-            "args": [".\\EarthBound (USA).sfc"],
+            "args": [".\\super_metroid.sfc"],
             "cwd": "${workspaceFolder}"
         },
         {

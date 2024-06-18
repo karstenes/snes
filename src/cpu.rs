@@ -488,7 +488,8 @@ pub struct InstructionContext {
     pub opcode: OpCode,
     pub mode: AddrMode,
     pub inst_addr: u32,
-    pub data_addr: u32
+    pub data_addr: u32,
+    pub dest_addr: Option<u32>
 }
 
 impl std::fmt::Display for InstructionContext {
@@ -777,9 +778,10 @@ fn calculate_cycles(snes: &Console, instruction: InstructionContext) -> Result<u
     Ok(cycles)
 }
 
-fn calculate_address(snes: &Console, op: &OpCode, mode: &AddrMode) -> Result<u32> {
+fn calculate_address(snes: &Console, op: &OpCode, mode: &AddrMode) -> Result<(u32, Option<u32>)> {
     let l = memory::read_byte(snes, snes.cpu.get_pc()+1)? as u32;
     let h = memory::read_byte(snes, snes.cpu.get_pc()+2)? as u32;
+    let mut dest = None;
     let addr = match mode {
         AddrMode::Absolute => {
             if op.is_jump() {
@@ -903,11 +905,21 @@ fn calculate_address(snes: &Console, op: &OpCode, mode: &AddrMode) -> Result<u32
             let temp = snes.cpu.PC.wrapping_add(3).wrapping_add(u16::from_be_bytes([h as u8,l as u8])).to_be_bytes();
             u32::from_be_bytes([0x00, snes.cpu.K, temp[0], temp[1]])
         },
-        AddrMode::SourceDestination => todo!(),
-        AddrMode::Stack => todo!(),
-        AddrMode::StackIndexed => todo!(),
+        AddrMode::SourceDestination => {
+            dest = Some(l << 16 | snes.cpu.X as u32);
+            h << 16 | snes.cpu.Y as u32
+        },
+        AddrMode::Stack => {
+            (l as u16 + snes.cpu.S) as u32
+        },
+        AddrMode::StackIndexed => {
+            let low = memory::read_byte(snes, (l as u16 + snes.cpu.S) as u32)?;
+            let high = memory::read_byte(snes, (l as u16 + snes.cpu.S + 1) as u32)?;
+            let temp = u32::from_be_bytes([0, snes.cpu.DBR, high, low]);
+            temp + snes.cpu.Y as u32
+        },
     };
-    Ok(addr)
+    Ok((addr, dest))
 }
 
 pub fn decode_instruction(snes: &Console, instruction: u8) -> Result<InstructionContext> {
@@ -1020,7 +1032,8 @@ pub fn decode_instruction(snes: &Console, instruction: u8) -> Result<Instruction
         opcode,
         mode,
         inst_addr: snes.cpu.get_pc(),
-        data_addr: address,
+        data_addr: address.0,
+        dest_addr: address.1
     })
 }
 
