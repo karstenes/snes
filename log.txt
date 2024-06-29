@@ -1,232 +1,104 @@
    Compiling snes v0.1.0 (C:\Users\kschn\Documents\gits\snes)
-warning: unused import: `std::ops::Add`
- --> src\cpu.rs:1:5
+warning: unused imports: `borrow::BorrowMut`, `vec`
+ --> src\debugger.rs:1:11
   |
-1 | use std::ops::Add;
-  |     ^^^^^^^^^^^^^
+1 | use std::{borrow::BorrowMut, vec};
+  |           ^^^^^^^^^^^^^^^^^  ^^^
   |
   = note: `#[warn(unused_imports)]` on by default
 
-warning: unused import: `ensure`
- --> src\cpu.rs:6:20
-  |
-6 | use anyhow::{bail, ensure, Ok, Result};
-  |                    ^^^^^^
+warning: unused import: `std::path`
+   --> src\debugger.rs:153:5
+    |
+153 | use std::path;
+    |     ^^^^^^^^^
 
-warning: unused import: `std::fs::read`
- --> src\memory.rs:1:5
-  |
-1 | use std::fs::read;
-  |     ^^^^^^^^^^^^^
+warning: unused import: `anyhow::Result`
+   --> src\debugger.rs:154:5
+    |
+154 | use anyhow::Result;
+    |     ^^^^^^^^^^^^^^
 
-warning: unused import: `Context`
- --> src\memory.rs:6:28
-  |
-6 | use anyhow::{bail, ensure, Context, Result};
-  |                            ^^^^^^^
+warning: unused import: `crate::cartridge`
+   --> src\debugger.rs:155:5
+    |
+155 | use crate::cartridge;
+    |     ^^^^^^^^^^^^^^^^
 
-warning: unused imports: `debug`, `info`
- --> src\memory.rs:8:11
-  |
-8 | use log::{debug, info, trace};
-  |           ^^^^^  ^^^^
+warning: unused import: `crate::cpu`
+   --> src\debugger.rs:156:5
+    |
+156 | use crate::cpu;
+    |     ^^^^^^^^^^
 
-warning: unused import: `anyhow::Context`
- --> src\main.rs:7:5
-  |
-7 | use anyhow::Context;
-  |     ^^^^^^^^^^^^^^^
+warning: unused import: `crate::MMIORegisters`
+   --> src\debugger.rs:157:5
+    |
+157 | use crate::MMIORegisters;
+    |     ^^^^^^^^^^^^^^^^^^^^
 
-warning: unused import: `crossterm::QueueableCommand`
-  --> src\main.rs:12:5
+warning: unused import: `crate::Console`
+   --> src\debugger.rs:158:5
+    |
+158 | use crate::Console;
+    |     ^^^^^^^^^^^^^^
+
+warning: unused import: `super::debug_instructions`
+   --> src\debugger.rs:160:5
+    |
+160 | use super::debug_instructions;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::Console`
+ --> src\registers.rs:1:5
+  |
+1 | use super::Console;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::default`
+  --> src\main.rs:15:5
    |
-12 | use crossterm::QueueableCommand;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 | use std::default;
+   |     ^^^^^^^^^^^^
 
-warning: unused imports: `KeyEventKind`, `KeyEvent`, `queue`
-  --> src\main.rs:19:35
+warning: unused import: `std::process::Command`
+  --> src\main.rs:18:5
    |
-19 |     event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-   |                                   ^^^^^^^^  ^^^^^^^^^^^^
-20 |     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-21 |     queue
-   |     ^^^^^
+18 | use std::process::Command;
+   |     ^^^^^^^^^^^^^^^^^^^^^
 
-warning: unreachable expression
-    --> src\cpu.rs:1009:5
-     |
-1003 | /     match instruction.opcode {
-1004 | |         OpCode::BRK => {
-1005 | |             todo!("")
-1006 | |         }
-1007 | |         _ => todo!("Implement remaining instructions")
-1008 | |     }
-     | |_____- any code following this `match` expression is unreachable, as all arms diverge
-1009 |       Ok(())
-     |       ^^^^^^ unreachable expression
-     |
-     = note: `#[warn(unreachable_code)]` on by default
-
-warning: unreachable pattern
-   --> src\cpu.rs:608:17
-    |
-608 |                 AddrMode::Long => 6 - m,
-    |                 ^^^^^^^^^^^^^^
-    |
-    = note: `#[warn(unreachable_patterns)]` on by default
-
-warning: unreachable pattern
-   --> src\cpu.rs:609:17
-    |
-609 |                 AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
-    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unreachable pattern
-   --> src\cpu.rs:725:17
-    |
-725 |                 AddrMode::Long => 6 - m,
-    |                 ^^^^^^^^^^^^^^
-
-warning: unreachable pattern
-   --> src\cpu.rs:726:17
-    |
-726 |                 AddrMode::DirectIndexedWord => 7 - m + w - snes.cpu.P.x as u8 + (snes.cpu.P.x || p) as u8,
-    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: unused imports: `LeaveAlternateScreen`, `disable_raw_mode`
+  --> src\main.rs:27:16
+   |
+27 |     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
+   |                ^^^^^^^^^^^^^^^^                                         ^^^^^^^^^^^^^^^^^^^^
 
 warning: variable does not need to be mutable
-   --> src\main.rs:171:9
+   --> src\debugger.rs:110:9
     |
-171 |     let mut ram = vec![0; 0x200000];
-    |         ----^^^
+110 |     let mut tempstack = Vec::<DebugState>::new();
+    |         ----^^^^^^^^^
     |         |
     |         help: remove this `mut`
     |
     = note: `#[warn(unused_mut)]` on by default
 
-warning: variable `PCtemp` should have a snake case name
-  --> src\main.rs:67:17
-   |
-67 |         let mut PCtemp = snes.cpu.get_pc();
-   |                 ^^^^^^ help: convert the identifier to snake case: `pctemp`
-   |
-   = note: `#[warn(non_snake_case)]` on by default
+warning: variable does not need to be mutable
+   --> src\main.rs:272:9
+    |
+272 |     let mut ram = vec![0; 0x200000];
+    |         ----^^^
+    |         |
+    |         help: remove this `mut`
 
-warning: `snes` (bin "snes") generated 15 warnings (run `cargo fix --bin "snes"` to apply 9 suggestions)
-    Finished dev [unoptimized + debuginfo] target(s) in 1.40s
+warning: variable does not need to be mutable
+   --> src\main.rs:297:17
+    |
+297 |             let mut trash: String = String::default();
+    |                 ----^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: `snes` (bin "snes") generated 15 warnings (run `cargo fix --bin "snes"` to apply 15 suggestions)
+    Finished dev [unoptimized + debuginfo] target(s) in 1.86s
      Running `target\debug\snes.exe .\super_metroid.sfc`
- DEBUG snes::cartridge > Checksum F8DF and Complement 0720
- DEBUG snes::cartridge > Found LoROM mode ROM
- INFO  snes::cartridge > ROM is "Super Metroid"
- DEBUG snes::cartridge > Rom speed is Fast
- DEBUG snes::cartridge > Cartridge hardware: CartHardware { extra_hardware: RomRamBattery, coprocessor: None }
- DEBUG snes::cartridge > ROM size: 4096kB, RAM size: 8kB
- DEBUG snes::cartridge > Region: PAL
- DEBUG snes::cartridge > Developer ID: 01
- DEBUG snes::cartridge > Rom Version: 0
- TRACE snes::memory    > Read #1878 from ROM at address $00841C
- TRACE snes::memory    > Read #00 from RAM at address $001878
- TRACE snes::cpu       > Executing BRK in emu mode
- TRACE snes::memory    > Writing #00 to RAM at address $000100
- TRACE snes::memory    > Writing #00 to RAM at address $0001FF
- TRACE snes::memory    > Writing #7A to RAM at address $0001FE
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573
- TRACE snes::memory    > Read #005C from ROM at address $008573

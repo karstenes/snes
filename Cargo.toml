@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ahash = "0.8.11"
 anyhow = "1.0.86"
 crossterm = "0.27.0"
 env_logger = {version = "0.11.3", features = ["unstable-kv"]}
@@ -14,3 +15,4 @@ num_enum = "0.7.2"
 pretty_env_logger = {version = "0.5.0"}
 ratatui = { version = "0.26.3", features = ["all-widgets"] }
 thiserror = "1.0.61"
+tui-input = "*"
