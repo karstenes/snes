@@ -65,7 +65,7 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
     let bank = (addr & 0xFF0000) >> 16;
     let addr_word = addr & 0xFFFF;
     match addr {
-        addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
+        addr if (bank % 0x80) < 0x40
             && (addr_word >= 0x4200 && addr_word < 0x4220) => 
         {
             match addr_word {
@@ -87,7 +87,7 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
             read_rom_byte(&snes.cartridge, addr)
         }
         addr if (bank >= 0x7E && bank < 0x80)
-            || ((bank < 0x40 || (bank >= 0x80 && bank < 0xC0)) && addr_word < 0x2000) =>
+            || ((bank % 0x80) < 0x40 && addr_word < 0x2000) =>
         {
             read_ram_byte(&snes.ram, addr)
         }
@@ -135,7 +135,7 @@ fn peek_ram_word(ram: &Vec<u8>, addr: u32) -> Result<u16> {
         ),
         addr
     );
-    let read_data = ram[ram_addr] as u16 + ((ram[ram_addr + 1] as u16) << 8);
+    let read_data = ram[(addr & 0x1FFFF) as usize] as u16 + ((ram[(addr & 0x1FFFF) as usize + 1] as u16) << 8);
     Ok(read_data)
 }
 
@@ -149,7 +149,7 @@ fn peek_ram_byte(ram: &Vec<u8>, addr: u32) -> Result<u8> {
         ),
         addr
     );
-    let read_data = ram[ram_addr];
+    let read_data = ram[(addr & 0x1FFFF) as usize];
     Ok(read_data)
 }
 
@@ -163,7 +163,7 @@ fn read_ram_word(ram: &Vec<u8>, addr: u32) -> Result<u16> {
         ),
         addr
     );
-    let read_data = ram[ram_addr] as u16 + ((ram[ram_addr + 1] as u16) << 8);
+    let read_data = ram[(addr & 0x1FFFF) as usize] as u16 + ((ram[(addr & 0x1FFFF) as usize + 1] as u16) << 8);
     trace!("Read #{:04X} from RAM at address ${:06x}", read_data, addr);
     Ok(read_data)
 }
@@ -178,8 +178,8 @@ fn read_ram_byte(ram: &Vec<u8>, addr: u32) -> Result<u8> {
         ),
         addr
     );
-    let read_data = ram[ram_addr];
-    trace!("Read #{:02X} from RAM at address ${:06x}", read_data, addr);
+    let read_data = ram[(addr & 0x1FFFF) as usize];
+    trace!("Read #{:02X} from RAM at address ${:06X}", read_data, addr);
     Ok(read_data)
 }
 
@@ -472,8 +472,13 @@ pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
         {
             write_ram_byte(&mut snes.ram, addr, data)
         }
+        addr if (bank % 0x80) < 0x40
+            && addr_word >= 0x2000
+            && addr_word < 0x8000 => {
+            write_register_byte(snes, addr, data)
+        }
         _ => {
-            bail!("Memory access error! Tried to access {:06X}", addr)
+            bail!("Memory access error! Tried to write to address {:06X}", addr)
         }
     }
 }
@@ -501,5 +506,24 @@ fn write_ram_byte(ram: &mut Vec<u8>, addr: u32, val: u8) -> Result<()> {
     );
     trace!("Writing #{:02X} to RAM at address ${:06X}", val, addr);
     ram[(addr & 0x1FFFF) as usize] = val;
+    Ok(())
+}
+
+fn write_register_byte(snes: &mut Console, addr: u32, val: u8) -> Result<()> {
+    let addr_demirror = addr % 0x800000;
+    let addr_word: u16 = (addr_demirror & 0xFFFF) as u16;
+    ensure!(
+        addr_demirror.to_be_bytes()[1] < 0x40 && 
+        addr_word >= 0x2000 &&
+        addr_word < 0x8000,
+        "Attempted to write to register at ${:06X}, which is out of bounds",
+        addr
+    );
+    match addr {
+        0x2100 => {
+            trace!("Wrote to INIDISP at {:06X}", addr);
+        }
+        _ => {}
+    }
     Ok(())
 }

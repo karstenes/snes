@@ -1,4 +1,4 @@
-#![allow(unused_variables, dead_code)]
+#![allow(unused_variables, dead_code, unused_mut)]
 
 mod cpu;
 mod cartridge;
@@ -12,10 +12,8 @@ use cpu::*;
 use registers::*;
 use crossterm::event::KeyEventKind;
 use crossterm::ExecutableCommand;
-use std::default;
 use std::env;
 use std::path;
-use std::process::Command;
 use tui_input::backend::crossterm::EventHandler;
 use tui_input::Input;
 use anyhow::Result;
@@ -34,6 +32,12 @@ use ratatui::{
     
 };
 use symbols::scrollbar;
+use debugger::{
+    debug_simulation,
+    DisassemblerContext,
+    Flag,
+    render_wrapped_instructions
+};
 
 
 #[derive(Debug, Default)]
@@ -46,16 +50,16 @@ enum InputMode {
 pub struct App {
     scroll_state: ScrollbarState,
     stack_scroll: u16,
-    current_instr_context: Vec<String>,
-    current_instr_loc: usize,
+    disassembled: DisassemblerContext,
     current_pc: u32,
     branch_taken: bool,
+    disassembler_ptr: usize,
     input: Input,
     input_mode: InputMode,
     subroutine_stack: Vec<u32>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Console {
     cpu: CPU,
     cartridge: Cartridge,
@@ -104,44 +108,38 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
         Layout::vertical([Constraint::Percentage(100)]).split(chunks[0])
     };
 
-    app.current_instr_loc = 0;
-    app.current_instr_context.clear();
-
-    if app.branch_taken {
-        app.current_instr_loc = 0;
-        app.current_instr_context.clear();
-        app.branch_taken = false;
-    }
     
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::ROUNDED);
     
-    if app.current_instr_context.is_empty() {
-        let opcode = memory::peek_byte(&snes, snes.cpu.get_pc())?;
-        let mut currinstr = cpu::decode_instruction(&snes, opcode, snes.cpu.get_pc())?;
-        let mut pctemp = snes.cpu.get_pc();
-        app.current_instr_context.push(currinstr.with_source(&snes).to_string());
-        while !(currinstr.opcode.is_jump() || currinstr.opcode.is_interrupt()) || currinstr.opcode.is_branch() || pctemp > (snes.cpu.get_pc() + 0x200) {
-            pctemp += currinstr.length(true, snes.cpu.P.x) as u32;
-            let opcode = memory::peek_byte(&snes, pctemp)?;
-            currinstr = cpu::decode_instruction(&snes, opcode, snes.cpu.get_pc())?;
-            currinstr.inst_addr = pctemp;
-            app.current_instr_context.push(currinstr.with_source(&snes).to_string());
+    if app.disassembler_ptr == app.disassembled.lines.len() {
+        app.disassembler_ptr = 0;
+        let temp = debug_simulation(snes, 100)?;
+        app.disassembled = render_wrapped_instructions(temp);
+    }
+
+    let mut rendertext: Vec<Line> = vec![Line::default(); app.disassembled.lines.len()];
+
+    for (i, line) in rendertext.iter_mut().enumerate() {
+        let mut line_string = String::default();
+        for _ in 0..app.disassembled.branchdepth-app.disassembled.lines[i].flags.len() {
+            line_string.push(' ');
+        }
+        for flag in app.disassembled.lines[i].flags.iter() {
+            match flag {
+                Flag::BranchStart(_) => line_string.push('╔'),
+                Flag::BranchCont(_) => line_string.push('║'),
+                Flag::BranchEnd(_) => line_string.push('╚')
+            }
+        }
+        line_string.push_str(format!("{:}", app.disassembled.lines[i].disassembled).as_str());
+        if app.disassembled.lines[i].location == snes.cpu.get_pc() {
+            *line = Line::from(line_string).on_green().black();
+        } else {
+            *line = Line::from(line_string);
         }
     }
-
-    if app.current_instr_loc == app.current_instr_context.len() {
-        app.current_instr_loc = 0;
-        app.current_instr_context.clear();
-    }
-
-    let rendertext: Vec<Line> = app.current_instr_context
-        .iter()
-        .enumerate()
-        .map(|(i, f)| if i == app.current_instr_loc 
-            {Line::from(f.clone()).on_green().black()} else {Line::from(f.clone())})
-        .collect();
         
     let instr_text = Text::from(rendertext);
 
@@ -286,7 +284,7 @@ fn main() -> Result<()> {
     
     let tick_rate = Duration::from_millis(100);
     let mut app = App::default();
-    app.current_instr_context = Vec::new();
+    app.disassembler_ptr = 0;
     app.current_pc = snes.cpu.get_pc();
     let mut last_tick = Instant::now();
     'mainloop: loop {
@@ -294,7 +292,7 @@ fn main() -> Result<()> {
             let op = memory::read_byte(&snes, snes.cpu.get_pc())?;
             let instr = cpu::decode_instruction(&snes, op, snes.cpu.get_pc())?;
             cpu::execute_instruction(&mut snes, &instr)?;
-            let mut trash: String = String::default();
+            // let mut trash: String = String::default();
             // io::stdin().read_line(&mut trash)?;
             trace!("Next");
         } else {        
@@ -330,12 +328,19 @@ fn main() -> Result<()> {
                                     let op = memory::read_byte(&snes, snes.cpu.get_pc())?;
                                     let instr = cpu::decode_instruction(&snes, op, snes.cpu.get_pc())?;
                                     let res = cpu::execute_instruction(&mut snes, &instr)?;
-                                    app.current_instr_loc += 1;
                                     app.branch_taken = matches!(res, cpu::CPUExecutionResult::BranchTaken);
+                                    if matches!(res, cpu::CPUExecutionResult::Jump) {
+                                        app.disassembler_ptr = 0;
+                                        app.disassembled = DisassemblerContext::default();
+                                    }
                                     if let CPUExecutionResult::Subroutine(addr) = res {
+                                        app.disassembled = DisassemblerContext::default();
+                                        app.disassembler_ptr = 0;
                                         app.subroutine_stack.push(addr);
                                     }
                                     if let CPUExecutionResult::Return = res {
+                                        app.disassembled = DisassemblerContext::default();
+                                        app.disassembler_ptr = 0;
                                         app.subroutine_stack.pop();
                                     }
                                     app.current_pc = snes.cpu.get_pc();
@@ -367,9 +372,9 @@ fn main() -> Result<()> {
         }
     }
 
-    // disable_raw_mode()?;
-    // terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    // terminal.show_cursor()?;
+    disable_raw_mode()?;
+    terminal.backend_mut().execute(LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
 
     Ok(())
 }

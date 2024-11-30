@@ -263,7 +263,7 @@ impl std::fmt::Display for OpCode {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum AddrMode {
     Absolute,
     AbsoluteWord,
@@ -343,7 +343,7 @@ impl std::fmt::Display for AddrMode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Flags {
     /// Negative
     pub n: bool,
@@ -367,7 +367,7 @@ pub struct Flags {
     pub b: bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[allow(non_snake_case)]
 /// The 65C816 CPU
 pub struct CPU {
@@ -452,6 +452,19 @@ impl CPU {
         p |= (self.P.z as u8) << 1;
         p |= self.P.c as u8;
         p
+    }
+    fn set_p(&mut self, p: u8) {
+        self.P.c = (p & 0b00000001) != 0;
+        self.P.z = (p & 0b00000010) != 0;
+        self.P.i = (p & 0b00000100) != 0;
+        self.P.d = (p & 0b00001000) != 0;
+        self.P.x = (p & 0b00010000) != 0;
+        self.P.m = (p & 0b00100000) != 0;
+        self.P.v = (p & 0b01000000) != 0;
+        self.P.n = (p & 0b10000000) != 0;
+        if self.P.e {
+            self.P.x = true;
+        }
     }
     pub fn get_pc(&self) -> u32 {
         self.PC as u32 | (self.K as u32) << 16
@@ -1258,7 +1271,7 @@ fn execute_instruction_emu(snes: &mut Console, instruction: &InstructionContext)
             snes.cpu.P.c = snes.cpu.P.e;
             snes.cpu.P.e = temp;
         }
-        _ => todo!("Implement remaining instructions")
+        _ => todo!("Implement remaining instructions, tried to execute: {} in emu mode", instruction.opcode)
     }
     snes.cpu.PC += instruction.length(snes.cpu.P.m, snes.cpu.P.x) as u16;
     Ok(CPUExecutionResult::Normal)
@@ -1278,7 +1291,34 @@ pub fn execute_instruction(snes: &mut Console, instruction: &InstructionContext)
             push_byte(snes, snes.cpu.K)?;
             push_word(snes, (instruction.inst_addr as u16).wrapping_add(3))?;
             snes.cpu.set_pc(instruction.data_addr);
-            return Ok(CPUExecutionResult::Subroutine(instruction.inst_addr));
+            return Ok(CPUExecutionResult::Subroutine(instruction.data_addr));
+        },
+        OpCode::ADC => {
+            if snes.cpu.P.d {
+                unimplemented!("Decimal mode");
+                // let mut temp_A: [u8; 4] = [0;4];
+                // temp_A[0] = (snes.cpu.A & 0x000F) as u8;
+                // temp_A[1] = ((snes.cpu.A & 0x00F0) >> 4) as u8;
+                // temp_A[2] = ((snes.cpu.A & 0x0F00) >> 8) as u8;
+                // temp_A[3] = ((snes.cpu.A & 0xF000) >> 12) as u8;
+                // let mut temp_val: [u8; 4] = [0;4];
+                // let temp = memory::read_word(snes, instruction.data_addr)?;
+                // temp_val[0] = (temp & 0x000F) as u8;
+                // temp_val[1] = ((temp & 0x00F0) >> 4) as u8;
+                // temp_val[2] = ((temp & 0x0F00) >> 8) as u8;
+                // temp_val[3] = ((temp & 0xF000) >> 12) as u8;
+            } else {
+                let overflow: bool;
+                let overflow2: bool;
+                (snes.cpu.A, overflow) = snes.cpu.A.overflowing_add(memory::read_word(snes, instruction.data_addr)?);
+                (snes.cpu.A, overflow2) = snes.cpu.A.overflowing_add(snes.cpu.P.c as u16);
+                snes.cpu.P.z = snes.cpu.A == 0;
+                snes.cpu.P.n = snes.cpu.A >= 0b10000000;
+                snes.cpu.P.v = overflow || overflow2;
+                snes.cpu.P.c = overflow || overflow2;
+            }
+            
+            
         }
         OpCode::BPL => {
             if !snes.cpu.P.n {
@@ -1306,10 +1346,29 @@ pub fn execute_instruction(snes: &mut Console, instruction: &InstructionContext)
             snes.cpu.PC = snes.cartridge.header.interrupt_vectors.brk;
             return Ok(CPUExecutionResult::Interrupt);
         },
+        OpCode::CLC => {
+            snes.cpu.P.c = false;
+        }
+        OpCode::CMP => {
+            let data = memory::read_word(snes, instruction.data_addr)?;
+            let temp = u16::wrapping_sub(snes.cpu.A, data);
+            snes.cpu.P.n = temp >= 0b10000000;
+            snes.cpu.P.z = temp == 0;
+            snes.cpu.P.c = snes.cpu.A >= data;
+        },
         OpCode::DEX => {
             snes.cpu.X = snes.cpu.X.wrapping_sub(1);
             snes.cpu.P.n = (snes.cpu.X & 0x80) != 0;
             snes.cpu.P.z = snes.cpu.X == 0;
+        },
+        OpCode::LSR => {
+            if instruction.mode == AddrMode::Accumulator {
+                snes.cpu.A = snes.cpu.A >> 1;
+            } else {
+                let data = memory::read_word(snes, instruction.data_addr)?;
+                memory::write_word(snes, instruction.data_addr, data >> 1)?;
+            }
+            snes.cpu.P.c = false;
         }
         OpCode::STA => {
             if snes.cpu.P.m {
@@ -1417,11 +1476,21 @@ pub fn execute_instruction(snes: &mut Console, instruction: &InstructionContext)
         OpCode::PHP => {
             push_byte(snes, snes.cpu.p_byte())?;
         },
+        OpCode::PLP => {
+            let p = pull_byte(snes)?;
+            snes.cpu.set_p(p);
+        },
         OpCode::PLB => {
             let temp = pull_byte(snes)?;
             snes.cpu.P.n = (temp & 0x80) != 0;
             snes.cpu.P.z = temp == 0;
             snes.cpu.DBR = temp;
+        },
+        OpCode::RTL => {
+            let pc_l = pull_byte(snes)?;
+            let pc_h = pull_byte(snes)?;
+            snes.cpu.PC = u16::from_be_bytes([pc_h, pc_l]);
+            snes.cpu.K = pull_byte(snes)?;
         },
         OpCode::TCD => {
             snes.cpu.D = snes.cpu.A;

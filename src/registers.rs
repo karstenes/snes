@@ -1,7 +1,7 @@
-use super::Console;
+// use super::Console;
 
 #[allow(non_snake_case)]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct MMIORegisters {
     pub APUIO0: u8,
     pub APUIO1: u8,
@@ -36,4 +36,20 @@ pub struct MMIORegisters {
     pub RDDIVH: u8,
     pub DRMPYL: u8,
     pub DRMPYH: u8,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Default)]
+pub struct PPURegisters {
+    pub MPYL: u8,
+    pub MPYM: u8,
+    pub MPYH: u8,
+    pub SLHV: u8,
+    pub VMDATALREAD: u8,
+    pub VMDATAHREAD: u8,
+    pub CGDATAREAD: u16,
+    pub OPHCT: u16,
+    pub OPVCT: u16,
+    pub STAT77: u8,
+    pub STAT78: u8
 }

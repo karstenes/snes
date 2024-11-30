@@ -3,20 +3,20 @@ use anyhow::{Result, Context, bail};
 use num_enum::TryFromPrimitive;
 use log::{info, debug};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum MapMode {
     LoROM = 0,
     HiROM = 1,
     ExHiROM = 5
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RomSpeed {
     Slow,
     Fast
 }
 
-#[derive(TryFromPrimitive,Debug)]
+#[derive(Clone, TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum ExtraHardware {
     RomOnly,
@@ -28,7 +28,7 @@ pub enum ExtraHardware {
     RomCoprocessorBattery,
 }
 
-#[derive(TryFromPrimitive,Debug)]
+#[derive(Clone, TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum Coprocessor {
     DSP,
@@ -42,7 +42,7 @@ pub enum Coprocessor {
     Custom = 0xF
 }
 
-#[derive(TryFromPrimitive,Debug)]
+#[derive(Clone, TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum ChipsetSubtype {
     SPC7110,
@@ -51,20 +51,20 @@ pub enum ChipsetSubtype {
     CX4
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CartHardware {
     extra_hardware: ExtraHardware,
     coprocessor: Option<Coprocessor>
 }
  
-#[derive(TryFromPrimitive,Debug)]
+#[derive(Clone, TryFromPrimitive,Debug)]
 #[repr(u8)]
 pub enum Region {
     NTSC,
     PAL
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InterruptVectorTable {
     pub cop: u16,
     pub brk: u16,
@@ -79,7 +79,7 @@ pub struct InterruptVectorTable {
     pub irq_emu: u16
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ExpandedHeader {
     maker_code: String,
     game_code: String,
@@ -91,7 +91,7 @@ pub struct ExpandedHeader {
     chipset_subtype: ChipsetSubtype
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RomHeader {
     pub title: String,
     pub map_mode: MapMode,
@@ -110,7 +110,7 @@ pub struct RomHeader {
     pub expanded_header: Option<ExpandedHeader>
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Cartridge {
     pub header: RomHeader,
     pub rom_data: Vec<u8>
