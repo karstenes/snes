@@ -128,9 +128,9 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
         }
         for flag in app.disassembled.lines[i].flags.iter() {
             match flag {
-                Flag::BranchStart(_) => line_string.push('╔'),
-                Flag::BranchCont(_) => line_string.push('║'),
-                Flag::BranchEnd(_) => line_string.push('╚')
+                Flag::BranchStart(_) => line_string.push('┏'),
+                Flag::BranchCont(_) => line_string.push('┃'),
+                Flag::BranchEnd(_) => line_string.push('┗')
             }
         }
         line_string.push_str(format!("{:}", app.disassembled.lines[i].disassembled).as_str());
