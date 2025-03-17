@@ -1,8 +1,6 @@
-use std::default;
-
 use super::*;
 use crate::cpu::*;
-use anyhow::Result;
+use color_eyre::Result;
 use ahash::AHashMap;
 
 #[derive(Debug, Clone)]
@@ -369,7 +367,7 @@ pub fn render_wrapped_instructions(mut context: DisassemblerContext) -> Disassem
 mod tests {
 #![allow(unused_imports)]
 use std::path;
-use anyhow::Result;
+use color_eyre::Result;
 use crate::cartridge;
 use crate::cpu;
 use crate::debugger::Flag;

@@ -1,5 +1,5 @@
 use std::{fs, path::Path, str};
-use anyhow::{Result, Context, bail};
+use color_eyre::{eyre::{bail, Context}, Result};
 use num_enum::TryFromPrimitive;
 use log::{info, debug};
 
@@ -303,7 +303,7 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
 
 pub fn load_rom(rom_file: &Path) -> Result<Cartridge> {
     let file: Vec<u8> = fs::read(&rom_file)
-        .with_context(|| format!("Failed to read rom file {}", rom_file.display()))?;
+        .wrap_err_with(|| format!("Failed to read rom file {}", rom_file.display()))?;
 
     let header = load_rom_header(&file)?;    
 

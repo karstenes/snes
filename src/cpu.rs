@@ -1,7 +1,7 @@
 use crate::memory;
 
 use super::Console;
-use anyhow::{bail, Ok, Result};
+use color_eyre::{eyre::bail, eyre::Ok, Result};
 use log::trace;
 
 const OLD_OPCODES: [OpCode; 65] = [OpCode::LDA, OpCode::LDX, OpCode::LDY,

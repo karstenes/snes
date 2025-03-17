@@ -6,24 +6,19 @@ mod debugger;
 mod memory;
 mod registers;
 
-use anyhow::Ok;
+use better_panic::Settings;
 use cartridge::*;
 use cpu::*;
 use registers::*;
-use crossterm::event::KeyEventKind;
-use crossterm::ExecutableCommand;
 use std::env;
 use std::path;
 use tui_input::backend::crossterm::EventHandler;
 use tui_input::Input;
-use anyhow::Result;
+use color_eyre::{Result, eyre::Report};
 use pretty_env_logger;
 use log::trace;
-use std::{io, time::Duration, time::Instant};
-use crossterm::{
-    event::{self, Event, KeyCode},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
-};
+use std::{time::Duration, time::Instant};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     prelude::*,
     layout::Constraint,
@@ -44,6 +39,7 @@ use debugger::{
 enum InputMode {
     #[default] Normal,
     Edit,
+    Error
 }
 
 #[derive(Debug, Default)]
@@ -89,9 +85,9 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1] // Return the middle chunk
 }
 
-fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
+fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
 
-    let size = f.size();
+    let size = f.area();
 
     let chunks = Layout::horizontal([
         Constraint::Percentage(100),
@@ -112,12 +108,6 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::ROUNDED);
-    
-    if app.disassembler_ptr == app.disassembled.lines.len() {
-        app.disassembler_ptr = 0;
-        let temp = debug_simulation(snes, 100)?;
-        app.disassembled = render_wrapped_instructions(temp);
-    }
 
     let mut rendertext: Vec<Line> = vec![Line::default(); app.disassembled.lines.len()];
 
@@ -166,7 +156,7 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
         .block(block);
 
     let stackblock = Block::default()
-        .title(Title::from("Stack".bold()).alignment(Alignment::Center))
+        .title_top(Line::from("Stack".bold()).centered())
         .borders(Borders::ALL)
         .border_set(border::ROUNDED);
 
@@ -177,7 +167,7 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
     
 
     let regblock = Block::default()
-        .title(Title::from("Registers".bold()).alignment(Alignment::Center))
+        .title_top(Line::from("Registers".bold()).centered())
         .borders(Borders::ALL)
         .border_set(border::ROUNDED);
 
@@ -207,7 +197,7 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
             .track_symbol(None)
             .begin_symbol(None)
             .end_symbol(None),
-            chunks[1].inner(&Margin {
+            chunks[1].inner(Margin {
                 vertical: 1,
                 horizontal: 1,
             }),
@@ -228,8 +218,6 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) -> Result<()> {
         f.render_widget(Clear, area);
         f.render_widget(par, area);
     }
-
-    return Ok(())
 }
 
 fn execute_command(command: &str, snes: &mut Console) -> Result<()> {
@@ -247,23 +235,16 @@ fn execute_command(command: &str, snes: &mut Console) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    color_eyre::install()?;
     pretty_env_logger::init();
 
     let args: Vec<String> = env::args().collect();
 
     let file_path = path::Path::new(&args[1]);
     
-
-    let tui = if args.len() <= 2 {
-        enable_raw_mode()?;
-        true
-    } else { false };
-    let mut stdout = io::stdout();
-    if tui {
-        stdout.execute(EnterAlternateScreen)?;
-    }
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let (mut terminal, tui) = if args.len() <= 2 {
+        (Some(ratatui::init()), true)
+    } else { (None, false) };
 
     let cartridge = load_rom(file_path)?;
 
@@ -295,9 +276,14 @@ fn main() -> Result<()> {
             // let mut trash: String = String::default();
             // io::stdin().read_line(&mut trash)?;
             trace!("Next");
-        } else {        
-            terminal.draw(|f| ui(f, &mut app, &snes).unwrap())?;
-            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+        } else {
+            if app.disassembler_ptr == app.disassembled.lines.len() {
+                let temp = debug_simulation(&snes, 100)?;
+                app.disassembled = render_wrapped_instructions(temp);
+                app.disassembler_ptr = 0;                
+            }
+            terminal.as_mut().unwrap().draw(|f| ui(f, &mut app, &snes))?;
+            let timeout: Duration = tick_rate.saturating_sub(last_tick.elapsed());
             if crossterm::event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match app.input_mode {
@@ -361,7 +347,7 @@ fn main() -> Result<()> {
                                     app.input.handle_event(&Event::Key(key));
                                 }
                             }
-                        },
+                        }
                         _ => {}
                     }
                 }
@@ -372,9 +358,7 @@ fn main() -> Result<()> {
         }
     }
 
-    disable_raw_mode()?;
-    terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
+    ratatui::restore();
 
     Ok(())
 }

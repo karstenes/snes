@@ -1,7 +1,7 @@
 use crate::cartridge;
 
 use super::Console;
-use anyhow::{bail, ensure, Result};
+use color_eyre::{eyre::bail, eyre::ensure, Result};
 use cartridge::*;
 use log::trace;
 
