@@ -22,7 +22,7 @@
             "env": {
                 "RUST_LOG": "TRACE"
             },
-            "args": [".\\super_metroid.sfc", "--NO-TUI"],
+            "args": [".\\super_metroid.sfc"],
             "cwd": "${workspaceFolder}"
         },
         {

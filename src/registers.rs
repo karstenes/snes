@@ -34,8 +34,8 @@ pub struct MMIORegisters {
     pub RDIO: u8,
     pub RDDIVL: u8,
     pub RDDIVH: u8,
-    pub DRMPYL: u8,
-    pub DRMPYH: u8,
+    pub RDMPYL: u8,
+    pub RDMPYH: u8,
 }
 
 #[allow(non_snake_case)]

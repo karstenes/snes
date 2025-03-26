@@ -1320,6 +1320,23 @@ pub fn execute_instruction(snes: &mut Console, instruction: &InstructionContext)
             
             
         }
+        OpCode::BIT => {
+            if instruction.mode != AddrMode::Immediate {
+                snes.cpu.P.z = snes.cpu.A.to_be_bytes()[1] & memory::read_byte(snes, instruction.data_addr)? == 0;
+            } else {
+                if snes.cpu.P.m {
+                    let temp = memory::read_byte(snes, instruction.data_addr)?;
+                    snes.cpu.P.z = temp & snes.cpu.A.to_be_bytes()[1] == 0;
+                    snes.cpu.P.n = temp & 0x80 > 0;
+                    snes.cpu.P.v = temp & 0x40 > 0;
+                } else {
+                    let temp = memory::read_word(snes, instruction.data_addr)?;
+                    snes.cpu.P.z = temp & snes.cpu.A == 0;
+                    snes.cpu.P.n = temp & 0x8000 > 0;
+                    snes.cpu.P.v = temp & 0x4000 > 0;
+                }
+            }
+        }
         OpCode::BPL => {
             if !snes.cpu.P.n {
                 snes.cpu.PC = instruction.data_addr as u16;
@@ -1467,6 +1484,19 @@ pub fn execute_instruction(snes: &mut Console, instruction: &InstructionContext)
                 snes.cpu.P.z = snes.cpu.X == 0;
             }
         },
+        OpCode::LDY => {
+            if snes.cpu.P.x {
+                snes.cpu.Y &= 0xF0;
+                let temp = memory::read_byte(snes, instruction.data_addr)?;
+                snes.cpu.Y |= temp as u16;
+                snes.cpu.P.n = (temp & 0x80) != 0;
+                snes.cpu.P.z = temp == 0;
+            } else {
+                snes.cpu.Y = memory::read_word(snes, instruction.data_addr)?;
+                snes.cpu.P.n = (snes.cpu.Y & 0x80) != 0;
+                snes.cpu.P.z = snes.cpu.Y == 0;
+            }
+        },
         OpCode::PHK => {
             push_byte(snes, snes.cpu.K)?;
         },
@@ -1475,6 +1505,20 @@ pub fn execute_instruction(snes: &mut Console, instruction: &InstructionContext)
         },
         OpCode::PHP => {
             push_byte(snes, snes.cpu.p_byte())?;
+        },
+        OpCode::PHX => {
+            if snes.cpu.P.x {
+                push_byte(snes, snes.cpu.X.to_be_bytes()[1])?;
+            } else {
+                push_word(snes, snes.cpu.X)?;
+            }
+        },
+        OpCode::PHY => {
+            if snes.cpu.P.x {
+                push_byte(snes, snes.cpu.Y.to_be_bytes()[1])?;
+            } else {
+                push_word(snes, snes.cpu.Y)?;
+            }
         },
         OpCode::PLP => {
             let p = pull_byte(snes)?;

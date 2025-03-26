@@ -278,7 +278,14 @@ fn main() -> Result<()> {
             trace!("Next");
         } else {
             if app.disassembler_ptr == app.disassembled.lines.len() {
-                let temp = debug_simulation(&snes, 100)?;
+                let temp = match debug_simulation(&snes, 100) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        ratatui::restore();
+                        println!("{:}",e);
+                        return Err(e);
+                    }
+                };
                 app.disassembled = render_wrapped_instructions(temp);
                 app.disassembler_ptr = 0;                
             }

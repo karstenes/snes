@@ -3,7 +3,7 @@ use crate::cartridge;
 use super::Console;
 use color_eyre::{eyre::bail, eyre::ensure, Result};
 use cartridge::*;
-use log::trace;
+use log::{error, trace};
 
 pub fn read_word(snes: &Console, addr: u32) -> Result<u16> {
     let bank = (addr & 0xFF0000) >> 16;
@@ -76,6 +76,42 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
                     } else {
                         Ok(0xFF)
                     }
+                }
+                0x4210 => {
+                    error!("Unimplemented RDNMI");
+                    Ok(0x00)
+                }
+                0x4211 => {
+                    error!("Unimplemented TIMEUP");
+                    Ok(0x00)
+                }
+                0x4212 => {
+                    error!("Unimplemented HBVJOY");
+                    Ok(0x00)
+                }
+                0x4213 => {
+                    error!("Unimplemented RDIO");
+                    Ok(0x00)
+                }
+                0x4214 => {
+                    error!("Unimplemented RDDIVL");
+                    Ok(0x00)
+                }
+                0x4215 => {
+                    error!("Unimplemented RDDIVH");
+                    Ok(0x00)
+                }
+                0x4216 => {
+                    error!("Unimplemented RDMPYL");
+                    Ok(0x00)
+                }
+                0x4217 => {
+                    error!("Unimplemented RDMPYH");
+                    Ok(0x00)
+                }
+                0x4218 | 0x4219 | 0x421A | 0x421B | 0x421C | 0x421D | 0x421E | 0x421F => {
+                    error!("Unimplemented joypad #{:04X}", addr_word);
+                    Ok(0x00)
                 }
                 _ => bail!("Read from unknown/writeonly MMIO Register")
             }
@@ -453,12 +489,77 @@ pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
             && (addr_word >= 0x4200 && addr_word < 0x4220) => 
         {
             match addr_word {
+                0x4200 => {
+                    trace!("Writing #{:02X} to MEMSEL", data);
+                    snes.mmio.NMITIMEN = data;
+                    Ok(())
+                }
+                0x4201 => {
+                    trace!("Writing #{:02X} to WRIO", data);
+                    error!("Joypads umimplemented!");
+                    Ok(())
+                }
+                0x4202 => {
+                    trace!("Writing #{:02X} to WRMPYA", data);
+                    snes.mmio.WRMPYA = data;
+                    Ok(())
+                }
+                0x4203 => {
+                    trace!("Writing #{:02X} to WRMPYB", data);
+                    snes.mmio.WRMPYB = data;
+                    Ok(())
+                }
+                0x4204 => {
+                    trace!("Writing #{:02X} to WRDIVL", data);
+                    snes.mmio.WRDIVL = data;
+                    Ok(())
+                }
+                0x4205 => {
+                    trace!("Writing #{:02X} to WRMPYB", data);
+                    snes.mmio.WRDIVH = data;
+                    Ok(())
+                }
+                0x4206 => {
+                    trace!("Writing #{:02X} to WRDIVB", data);
+                    snes.mmio.WRDIVB = data;
+                    Ok(())
+                }
+                0x4207 => {
+                    trace!("Writing #{:02X} to HTIMEL", data);
+                    snes.mmio.HTIMEL = data;
+                    Ok(())
+                }
+                0x4208 => {
+                    trace!("Writing #{:02X} to HTIMEH", data);
+                    snes.mmio.HTIMEH = data;
+                    Ok(())
+                }
+                0x4209 => {
+                    trace!("Writing #{:02X} to VTIMEL", data);
+                    snes.mmio.VTIMEL = data;
+                    Ok(())
+                }
+                0x420A => {
+                    trace!("Writing #{:02X} to VTIMEH", data);
+                    snes.mmio.VTIMEH = data;
+                    Ok(())
+                }
+                0x420B => {
+                    trace!("Writing #{:02X} to MDMAEN", data);
+                    snes.mmio.MDMAEN = data;
+                    Ok(())
+                }
+                0x420C => {
+                    trace!("Writing #{:02X} to HDMAEN", data);
+                    snes.mmio.HDMAEN = data;
+                    Ok(())
+                }
                 0x420D => {
                     trace!("Writing #{:02X} to MEMSEL", data);
                     snes.mmio.MEMSEL = data;
                     Ok(())
                 }
-                _ => bail!("Write byte to unknown/readonly MMIO Register")
+                _ => bail!("Write byte to unknown/readonly MMIO Register #{:04X}", addr_word)
             }
         },
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))

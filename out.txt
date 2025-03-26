@@ -1,12 +1,769 @@
+   Compiling snes v0.1.0 (C:\Users\kschn\Documents\Gits\snes)
+warning: unused import: `better_panic::Settings`
+ --> src/main.rs:9:5
+  |
+9 | use better_panic::Settings;
+  |     ^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
 
-running 2 tests
-test cpu::tests::test_addrmode_decode ... ok
-test debugger::tests::test_debugger ... FAILED
+warning: unused import: `eyre::Report`
+  --> src/main.rs:17:26
+   |
+17 | use color_eyre::{Result, eyre::Report};
+   |                          ^^^^^^^^^^^^
 
-failures:
+warning: unreachable pattern
+  --> src\memory.rs:88:17
+   |
+72 |                 0x4212 => {
+   |                 ------ matches all the relevant values
+...
+88 |                 0x4212 => {
+   |                 ^^^^^^ no value can reach this
+   |
+   = note: `#[warn(unreachable_patterns)]` on by default
 
-failures:
-    debugger::tests::test_debugger
+warning: `snes` (bin "snes") generated 3 warnings (run `cargo fix --bin "snes"` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.88s
+     Running `target\debug\snes.exe .\super_metroid.sfc`
+ DEBUG snes::cartridge > Checksum F8DF and Complement 0720
+ DEBUG snes::cartridge > Found LoROM mode ROM
+ INFO  snes::cartridge > ROM is "Super Metroid"
+ DEBUG snes::cartridge > Rom speed is Fast
+ DEBUG snes::cartridge > Cartridge hardware: CartHardware { extra_hardware: RomRamBattery, coprocessor: None }
+ DEBUG snes::cartridge > ROM size: 4096kB, RAM size: 8kB
+ DEBUG snes::cartridge > Region: NTSC
+ DEBUG snes::cartridge > Developer ID: 01
+ DEBUG snes::cartridge > Rom Version: 0
+ TRACE snes::memory    > Read #0078 from ROM at address $00841C
+ TRACE snes::cpu       > Executing SEI in emu mode
+ TRACE snes::memory    > Read #0018 from ROM at address $00841D
+ TRACE snes::cpu       > Executing CLC in emu mode
+ TRACE snes::memory    > Read #00FB from ROM at address $00841E
+ TRACE snes::cpu       > Executing XCE in emu mode
+ TRACE snes::memory    > Read #005C from ROM at address $00841F
+ TRACE snes::memory    > Read #0080 from ROM at address $008422
+ TRACE snes::memory    > Read #00E2 from ROM at address $008423
+ TRACE snes::memory    > Read #A920 from ROM at address $008424
+ TRACE snes::cpu       > Executing $008423: SEP #20 (Immediate)
+ TRACE snes::memory    > Read #0020 from ROM at address $008424
+ TRACE snes::memory    > Read #00A9 from ROM at address $008425
+ TRACE snes::memory    > Read #8D01 from ROM at address $008426
+ TRACE snes::cpu       > Executing $008425: LDA #01 (Immediate)
+ TRACE snes::memory    > Read #0001 from ROM at address $008426
+ TRACE snes::memory    > Read #008D from ROM at address $008427
+ TRACE snes::cpu       > Executing $008427: STA $00420D (Absolute)
+ TRACE snes::memory    > Writing #01 to MEMSEL
+ TRACE snes::memory    > Read #0085 from ROM at address $00842A
+ TRACE snes::cpu       > Executing $00842A: STA $000086 (Direct)
+ TRACE snes::memory    > Writing #01 to RAM at address $000086
+ TRACE snes::memory    > Read #00C2 from ROM at address $00842C
+ TRACE snes::memory    > Read #A230 from ROM at address $00842D
+ TRACE snes::cpu       > Executing $00842C: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $00842D
+ TRACE snes::memory    > Read #00A2 from ROM at address $00842E
+ TRACE snes::memory    > Read #1FFF from ROM at address $00842F
+ TRACE snes::cpu       > Executing $00842E: LDX #1FFF (Immediate)
+ TRACE snes::memory    > Read #1FFF from ROM at address $00842F
+ TRACE snes::memory    > Read #009A from ROM at address $008431
+ TRACE snes::cpu       > Executing $008431: TXS (Implied)
+ TRACE snes::memory    > Read #00A9 from ROM at address $008432
+ TRACE snes::memory    > Read #0000 from ROM at address $008433
+ TRACE snes::cpu       > Executing $008432: LDA #0000 (Immediate)
+ TRACE snes::memory    > Read #0000 from ROM at address $008433
+ TRACE snes::memory    > Read #005B from ROM at address $008435
+ TRACE snes::cpu       > Executing $008435: TCD (Implied)
+ TRACE snes::memory    > Read #004B from ROM at address $008436
+ TRACE snes::cpu       > Executing $008436: PHK (Implied)
+ TRACE snes::memory    > Writing #00 to RAM at address $001FFF
+ TRACE snes::memory    > Read #00AB from ROM at address $008437
+ TRACE snes::cpu       > Executing $008437: PLB (Implied)
+ TRACE snes::memory    > Read #00 from RAM at address $001FFF
+ TRACE snes::memory    > Read #00E2 from ROM at address $008438
+ TRACE snes::memory    > Read #A230 from ROM at address $008439
+ TRACE snes::cpu       > Executing $008438: SEP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $008439
+ TRACE snes::memory    > Read #00A2 from ROM at address $00843A
+ TRACE snes::memory    > Read #AD04 from ROM at address $00843B
+ TRACE snes::cpu       > Executing $00843A: LDX #04 (Immediate)
+ TRACE snes::memory    > Read #0004 from ROM at address $00843B
+ TRACE snes::memory    > Read #00AD from ROM at address $00843C
+ TRACE snes::cpu       > Executing $00843C: LDA $004212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes::memory    > Read #0010 from ROM at address $00843F
+ TRACE snes::memory    > Read #00AD from ROM at address $008441
+ TRACE snes::cpu       > Executing $008441: LDA $004212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes::memory    > Read #0030 from ROM at address $008444
+ TRACE snes::memory    > Read #00CA from ROM at address $008446
+ TRACE snes::cpu       > Executing $008446: DEX (Implied)
+ TRACE snes::memory    > Read #00D0 from ROM at address $008447
+ TRACE snes::memory    > Read #00C2 from ROM at address $008449
+ TRACE snes::memory    > Read #A230 from ROM at address $00844A
+ TRACE snes::cpu       > Executing $008449: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $00844A
+ TRACE snes::memory    > Read #00A2 from ROM at address $00844B
+ TRACE snes::memory    > Read #1FFE from ROM at address $00844C
+ TRACE snes::cpu       > Executing $00844B: LDX #1FFE (Immediate)
+ TRACE snes::memory    > Read #1FFE from ROM at address $00844C
+ TRACE snes::memory    > Read #009E from ROM at address $00844E
+ TRACE snes::cpu       > Executing $00844E: STZ $001FFE (Absolute, X)
+ TRACE snes::memory    > Writing #0000 to RAM at address $001FFE
+ TRACE snes::memory    > Read #00CA from ROM at address $008451
+ TRACE snes::cpu       > Executing $008451: DEX (Implied)
+ TRACE snes::memory    > Read #00CA from ROM at address $008452
+ TRACE snes::cpu       > Executing $008452: DEX (Implied)
+ TRACE snes::memory    > Read #0010 from ROM at address $008453
+ TRACE snes::memory    > Read #0022 from ROM at address $008455
+ TRACE snes::memory    > Read #008B from ROM at address $008458
+ TRACE snes::memory    > Read #0022 from ROM at address $008459
+ TRACE snes::memory    > Read #0080 from ROM at address $00845C
+ TRACE snes::memory    > Read #0000 from ROM at address $00845D
+ TRACE snes::cpu       > Executing $00845D: BRK (Implied)
+ TRACE snes::memory    > Writing #00 to RAM at address $001FFF
+ TRACE snes::memory    > Writing #00 to RAM at address $001FFE
+ TRACE snes::memory    > Writing #5F to RAM at address $001FFD
+ TRACE snes::memory    > Writing #85 to RAM at address $001FFC
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0078 from ROM at address $00841C
+ TRACE snes::cpu       > Executing SEI in emu mode
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0018 from ROM at address $00841D
+ TRACE snes::cpu       > Executing CLC in emu mode
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00FB from ROM at address $00841E
+ TRACE snes::cpu       > Executing XCE in emu mode
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #005C from ROM at address $00841F
+ TRACE snes::memory    > Read #0080 from ROM at address $008422
+ TRACE snes::cpu       > Executing $00841F: JMP $808423 (Long)
+ TRACE snes::memory    > Read #00E2 from ROM at address $808423
+ TRACE snes::memory    > Read #A920 from ROM at address $808424
+ TRACE snes::cpu       > Executing $808423: SEP #20 (Immediate)
+ TRACE snes::memory    > Read #0020 from ROM at address $808424
+ TRACE snes::memory    > Read #00A9 from ROM at address $808425
+ TRACE snes::memory    > Read #8D01 from ROM at address $808426
+ TRACE snes::cpu       > Executing $808425: LDA #01 (Immediate)
+ TRACE snes::memory    > Read #0001 from ROM at address $808426
+ TRACE snes::memory    > Read #008D from ROM at address $808427
+ TRACE snes::cpu       > Executing $808427: STA $00420D (Absolute)
+ TRACE snes::memory    > Writing #01 to MEMSEL
+ TRACE snes::memory    > Read #0085 from ROM at address $80842A
+ TRACE snes::cpu       > Executing $80842A: STA $000086 (Direct)
+ TRACE snes::memory    > Writing #01 to RAM at address $000086
+ TRACE snes::memory    > Read #00C2 from ROM at address $80842C
+ TRACE snes::memory    > Read #A230 from ROM at address $80842D
+ TRACE snes::cpu       > Executing $80842C: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $80842D
+ TRACE snes::memory    > Read #00A2 from ROM at address $80842E
+ TRACE snes::memory    > Read #1FFF from ROM at address $80842F
+ TRACE snes::cpu       > Executing $80842E: LDX #1FFF (Immediate)
+ TRACE snes::memory    > Read #1FFF from ROM at address $80842F
+ TRACE snes::memory    > Read #009A from ROM at address $808431
+ TRACE snes::cpu       > Executing $808431: TXS (Implied)
+ TRACE snes::memory    > Read #00A9 from ROM at address $808432
+ TRACE snes::memory    > Read #0000 from ROM at address $808433
+ TRACE snes::cpu       > Executing $808432: LDA #0000 (Immediate)
+ TRACE snes::memory    > Read #0000 from ROM at address $808433
+ TRACE snes::memory    > Read #005B from ROM at address $808435
+ TRACE snes::cpu       > Executing $808435: TCD (Implied)
+ TRACE snes::memory    > Read #004B from ROM at address $808436
+ TRACE snes::cpu       > Executing $808436: PHK (Implied)
+ TRACE snes::memory    > Writing #80 to RAM at address $001FFF
+ TRACE snes::memory    > Read #00AB from ROM at address $808437
+ TRACE snes::cpu       > Executing $808437: PLB (Implied)
+ TRACE snes::memory    > Read #80 from RAM at address $001FFF
+ TRACE snes::memory    > Read #00E2 from ROM at address $808438
+ TRACE snes::memory    > Read #A230 from ROM at address $808439
+ TRACE snes::cpu       > Executing $808438: SEP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $808439
+ TRACE snes::memory    > Read #00A2 from ROM at address $80843A
+ TRACE snes::memory    > Read #AD04 from ROM at address $80843B
+ TRACE snes::cpu       > Executing $80843A: LDX #04 (Immediate)
+ TRACE snes::memory    > Read #0004 from ROM at address $80843B
+ TRACE snes::memory    > Read #00AD from ROM at address $80843C
+ TRACE snes::cpu       > Executing $80843C: LDA $804212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes::memory    > Read #0010 from ROM at address $80843F
+ TRACE snes::memory    > Read #00AD from ROM at address $808441
+ TRACE snes::cpu       > Executing $808441: LDA $804212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes::memory    > Read #0030 from ROM at address $808444
+ TRACE snes::memory    > Read #00CA from ROM at address $808446
+ TRACE snes::cpu       > Executing $808446: DEX (Implied)
+ TRACE snes::memory    > Read #00D0 from ROM at address $808447
+ TRACE snes::memory    > Read #00C2 from ROM at address $808449
+ TRACE snes::memory    > Read #A230 from ROM at address $80844A
+ TRACE snes::cpu       > Executing $808449: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $80844A
+ TRACE snes::memory    > Read #00A2 from ROM at address $80844B
+ TRACE snes::memory    > Read #1FFE from ROM at address $80844C
+ TRACE snes::cpu       > Executing $80844B: LDX #1FFE (Immediate)
+ TRACE snes::memory    > Read #1FFE from ROM at address $80844C
+ TRACE snes::memory    > Read #009E from ROM at address $80844E
+ TRACE snes::cpu       > Executing $80844E: STZ $801FFE (Absolute, X)
+ TRACE snes::memory    > Writing #0000 to RAM at address $801FFE
+ TRACE snes::memory    > Read #00CA from ROM at address $808451
+ TRACE snes::cpu       > Executing $808451: DEX (Implied)
+ TRACE snes::memory    > Read #00CA from ROM at address $808452
+ TRACE snes::cpu       > Executing $808452: DEX (Implied)
+ TRACE snes::memory    > Read #0010 from ROM at address $808453
+ TRACE snes::memory    > Read #0022 from ROM at address $808455
+ TRACE snes::memory    > Read #008B from ROM at address $808458
+ TRACE snes::memory    > Read #0022 from ROM at address $808459
+ TRACE snes::memory    > Read #0080 from ROM at address $80845C
+ TRACE snes::memory    > Read #0000 from ROM at address $80845D
+ TRACE snes::cpu       > Executing $80845D: BRK (Implied)
+ TRACE snes::memory    > Writing #80 to RAM at address $001FFF
+ TRACE snes::memory    > Writing #00 to RAM at address $001FFE
+ TRACE snes::memory    > Writing #5F to RAM at address $001FFD
+ TRACE snes::memory    > Writing #85 to RAM at address $001FFC
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00E2 from ROM at address $808423
+ TRACE snes::cpu       > Executing $808423: SEP #20 (Immediate)
+ TRACE snes::memory    > Read #0020 from ROM at address $808424
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00A9 from ROM at address $808425
+ TRACE snes::cpu       > Executing $808425: LDA #01 (Immediate)
+ TRACE snes::memory    > Read #0001 from ROM at address $808426
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #008D from ROM at address $808427
+ TRACE snes::cpu       > Executing $808427: STA $00420D (Absolute)
+ TRACE snes::memory    > Writing #01 to MEMSEL
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0085 from ROM at address $80842A
+ TRACE snes::cpu       > Executing $80842A: STA $000086 (Direct)
+ TRACE snes::memory    > Writing #01 to RAM at address $000086
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00C2 from ROM at address $80842C
+ TRACE snes::cpu       > Executing $80842C: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $80842D
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00A2 from ROM at address $80842E
+ TRACE snes::cpu       > Executing $80842E: LDX #1FFF (Immediate)
+ TRACE snes::memory    > Read #1FFF from ROM at address $80842F
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #009A from ROM at address $808431
+ TRACE snes::cpu       > Executing $808431: TXS (Implied)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00A9 from ROM at address $808432
+ TRACE snes::cpu       > Executing $808432: LDA #0000 (Immediate)
+ TRACE snes::memory    > Read #0000 from ROM at address $808433
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #005B from ROM at address $808435
+ TRACE snes::cpu       > Executing $808435: TCD (Implied)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #004B from ROM at address $808436
+ TRACE snes::cpu       > Executing $808436: PHK (Implied)
+ TRACE snes::memory    > Writing #80 to RAM at address $001FFF
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00AB from ROM at address $808437
+ TRACE snes::cpu       > Executing $808437: PLB (Implied)
+ TRACE snes::memory    > Read #80 from RAM at address $001FFF
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00E2 from ROM at address $808438
+ TRACE snes::cpu       > Executing $808438: SEP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $808439
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00A2 from ROM at address $80843A
+ TRACE snes::cpu       > Executing $80843A: LDX #04 (Immediate)
+ TRACE snes::memory    > Read #0004 from ROM at address $80843B
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00AD from ROM at address $80843C
+ TRACE snes::cpu       > Executing $80843C: LDA $804212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0010 from ROM at address $80843F
+ TRACE snes::cpu       > Executing $80843F: BPL $80843C (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00AD from ROM at address $808441
+ TRACE snes::cpu       > Executing $808441: LDA $804212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0030 from ROM at address $808444
+ TRACE snes::cpu       > Executing $808444: BMI $808441 (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00CA from ROM at address $808446
+ TRACE snes::cpu       > Executing $808446: DEX (Implied)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00D0 from ROM at address $808447
+ TRACE snes::cpu       > Executing $808447: BNE $80843C (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00AD from ROM at address $80843C
+ TRACE snes::cpu       > Executing $80843C: LDA $804212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0010 from ROM at address $80843F
+ TRACE snes::cpu       > Executing $80843F: BPL $80843C (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00AD from ROM at address $80843C
+ TRACE snes::cpu       > Executing $80843C: LDA $804212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0010 from ROM at address $80843F
+ TRACE snes::cpu       > Executing $80843F: BPL $80843C (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00AD from ROM at address $808441
+ TRACE snes::cpu       > Executing $808441: LDA $804212 (Absolute)
+ TRACE snes::memory    > Unimplemented HBVJOY
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0030 from ROM at address $808444
+ TRACE snes::cpu       > Executing $808444: BMI $808441 (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00CA from ROM at address $808446
+ TRACE snes::cpu       > Executing $808446: DEX (Implied)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00D0 from ROM at address $808447
+ TRACE snes::cpu       > Executing $808447: BNE $80843C (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00C2 from ROM at address $808449
+ TRACE snes::cpu       > Executing $808449: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $80844A
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00A2 from ROM at address $80844B
+ TRACE snes::cpu       > Executing $80844B: LDX #1FFE (Immediate)
+ TRACE snes::memory    > Read #1FFE from ROM at address $80844C
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #009E from ROM at address $80844E
+ TRACE snes::cpu       > Executing $80844E: STZ $801FFE (Absolute, X)
+ TRACE snes::memory    > Writing #0000 to RAM at address $801FFE
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00CA from ROM at address $808451
+ TRACE snes::cpu       > Executing $808451: DEX (Implied)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00CA from ROM at address $808452
+ TRACE snes::cpu       > Executing $808452: DEX (Implied)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0010 from ROM at address $808453
+ TRACE snes::cpu       > Executing $808453: BPL $80844E (Relative8)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0022 from ROM at address $808455
+ TRACE snes::memory    > Read #008B from ROM at address $808458
+ TRACE snes::cpu       > Executing $808455: JSL $8B9146 (Long)
+ TRACE snes::memory    > Writing #80 to RAM at address $001FFF
+ TRACE snes::memory    > Writing #84 to RAM at address $001FFE
+ TRACE snes::memory    > Writing #58 to RAM at address $001FFD
+ TRACE snes::memory    > Read #0008 from ROM at address $8B9146
+ TRACE snes::cpu       > Executing $8B9146: PHP (Implied)
+ TRACE snes::memory    > Writing #85 to RAM at address $001FFC
+ TRACE snes::memory    > Read #008B from ROM at address $8B9147
+ TRACE snes::cpu       > Executing $8B9147: PHB (Implied)
+ TRACE snes::memory    > Writing #80 to RAM at address $001FFB
+ TRACE snes::memory    > Read #004B from ROM at address $8B9148
+ TRACE snes::cpu       > Executing $8B9148: PHK (Implied)
+ TRACE snes::memory    > Writing #8B to RAM at address $001FFA
+ TRACE snes::memory    > Read #00AB from ROM at address $8B9149
+ TRACE snes::cpu       > Executing $8B9149: PLB (Implied)
+ TRACE snes::memory    > Read #8B from RAM at address $001FFA
+ TRACE snes::memory    > Read #00E2 from ROM at address $8B914A
+ TRACE snes::memory    > Read #A930 from ROM at address $8B914B
+ TRACE snes::cpu       > Executing $8B914A: SEP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $8B914B
+ TRACE snes::memory    > Read #00A9 from ROM at address $8B914C
+ TRACE snes::memory    > Read #8D8F from ROM at address $8B914D
+ TRACE snes::cpu       > Executing $8B914C: LDA #8F (Immediate)
+ TRACE snes::memory    > Read #008F from ROM at address $8B914D
+ TRACE snes::memory    > Read #008D from ROM at address $8B914E
+ TRACE snes::cpu       > Executing $8B914E: STA $8B2100 (Absolute)
+ TRACE snes::memory    > Read #0085 from ROM at address $8B9151
+ TRACE snes::cpu       > Executing $8B9151: STA $000051 (Direct)
+ TRACE snes::memory    > Writing #FF to RAM at address $000051
+ TRACE snes::memory    > Read #00C2 from ROM at address $8B9153
+ TRACE snes::memory    > Read #9C30 from ROM at address $8B9154
+ TRACE snes::cpu       > Executing $8B9153: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $8B9154
+ TRACE snes::memory    > Read #009C from ROM at address $8B9155
+ TRACE snes::cpu       > Executing $8B9155: STZ $8B0590 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0590
+ TRACE snes::memory    > Read #0022 from ROM at address $8B9158
+ TRACE snes::memory    > Read #0080 from ROM at address $8B915B
+ TRACE snes::memory    > Read #0022 from ROM at address $8B915C
+ TRACE snes::memory    > Read #0080 from ROM at address $8B915F
+ TRACE snes::memory    > Read #009C from ROM at address $8B9160
+ TRACE snes::cpu       > Executing $8B9160: STZ $8B071D (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B071D
+ TRACE snes::memory    > Read #009C from ROM at address $8B9163
+ TRACE snes::cpu       > Executing $8B9163: STZ $8B071F (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B071F
+ TRACE snes::memory    > Read #009C from ROM at address $8B9166
+ TRACE snes::cpu       > Executing $8B9166: STZ $8B0721 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0721
+ TRACE snes::memory    > Read #00E2 from ROM at address $8B9169
+ TRACE snes::memory    > Read #A920 from ROM at address $8B916A
+ TRACE snes::cpu       > Executing $8B9169: SEP #20 (Immediate)
+ TRACE snes::memory    > Read #0020 from ROM at address $8B916A
+ TRACE snes::memory    > Read #00A9 from ROM at address $8B916B
+ TRACE snes::memory    > Read #8D01 from ROM at address $8B916C
+ TRACE snes::cpu       > Executing $8B916B: LDA #01 (Immediate)
+ TRACE snes::memory    > Read #0001 from ROM at address $8B916C
+ TRACE snes::memory    > Read #008D from ROM at address $8B916D
+ TRACE snes::cpu       > Executing $8B916D: STA $8B4200 (Absolute)
+ TRACE snes::memory    > Writing #F1 to MEMSEL
+ TRACE snes::memory    > Read #0085 from ROM at address $8B9170
+ TRACE snes::cpu       > Executing $8B9170: STA $000084 (Direct)
+ TRACE snes::memory    > Writing #F1 to RAM at address $000084
+ TRACE snes::memory    > Read #009C from ROM at address $8B9172
+ TRACE snes::cpu       > Executing $8B9172: STZ $8B4201 (Absolute)
+ TRACE snes::memory    > Writing #00 to WRIO
+ ERROR snes::memory    > Joypads umimplemented!
+ TRACE snes::memory    > Read #009C from ROM at address $8B9175
+ TRACE snes::cpu       > Executing $8B9175: STZ $8B4202 (Absolute)
+ TRACE snes::memory    > Writing #00 to WRMPYA
+ TRACE snes::memory    > Read #009C from ROM at address $8B9178
+ TRACE snes::cpu       > Executing $8B9178: STZ $8B4203 (Absolute)
+ TRACE snes::memory    > Writing #00 to WRMPYB
+ TRACE snes::memory    > Read #009C from ROM at address $8B917B
+ TRACE snes::cpu       > Executing $8B917B: STZ $8B4204 (Absolute)
+ TRACE snes::memory    > Writing #00 to WRDIVL
+ TRACE snes::memory    > Read #009C from ROM at address $8B917E
+ TRACE snes::cpu       > Executing $8B917E: STZ $8B4205 (Absolute)
+ TRACE snes::memory    > Writing #00 to WRMPYB
+ TRACE snes::memory    > Read #009C from ROM at address $8B9181
+ TRACE snes::cpu       > Executing $8B9181: STZ $8B4206 (Absolute)
+ TRACE snes::memory    > Writing #00 to WRDIVB
+ TRACE snes::memory    > Read #009C from ROM at address $8B9184
+ TRACE snes::cpu       > Executing $8B9184: STZ $8B4207 (Absolute)
+ TRACE snes::memory    > Writing #00 to HTIMEL
+ TRACE snes::memory    > Read #009C from ROM at address $8B9187
+ TRACE snes::cpu       > Executing $8B9187: STZ $8B4208 (Absolute)
+ TRACE snes::memory    > Writing #00 to HTIMEH
+ TRACE snes::memory    > Read #009C from ROM at address $8B918A
+ TRACE snes::cpu       > Executing $8B918A: STZ $8B4209 (Absolute)
+ TRACE snes::memory    > Writing #00 to VTIMEL
+ TRACE snes::memory    > Read #009C from ROM at address $8B918D
+ TRACE snes::cpu       > Executing $8B918D: STZ $8B420A (Absolute)
+ TRACE snes::memory    > Writing #00 to VTIMEH
+ TRACE snes::memory    > Read #009C from ROM at address $8B9190
+ TRACE snes::cpu       > Executing $8B9190: STZ $8B420B (Absolute)
+ TRACE snes::memory    > Writing #00 to MDMAEN
+ TRACE snes::memory    > Read #009C from ROM at address $8B9193
+ TRACE snes::cpu       > Executing $8B9193: STZ $8B420C (Absolute)
+ TRACE snes::memory    > Writing #00 to HDMAEN
+ TRACE snes::memory    > Read #0064 from ROM at address $8B9196
+ TRACE snes::cpu       > Executing $8B9196: STZ $000085 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000085
+ TRACE snes::memory    > Read #00A9 from ROM at address $8B9198
+ TRACE snes::memory    > Read #8D01 from ROM at address $8B9199
+ TRACE snes::cpu       > Executing $8B9198: LDA #01 (Immediate)
+ TRACE snes::memory    > Read #0001 from ROM at address $8B9199
+ TRACE snes::memory    > Read #008D from ROM at address $8B919A
+ TRACE snes::cpu       > Executing $8B919A: STA $8B420D (Absolute)
+ TRACE snes::memory    > Writing #F1 to MEMSEL
+ TRACE snes::memory    > Read #0085 from ROM at address $8B919D
+ TRACE snes::cpu       > Executing $8B919D: STA $000086 (Direct)
+ TRACE snes::memory    > Writing #F1 to RAM at address $000086
+ TRACE snes::memory    > Read #00A9 from ROM at address $8B919F
+ TRACE snes::memory    > Read #8D03 from ROM at address $8B91A0
+ TRACE snes::cpu       > Executing $8B919F: LDA #03 (Immediate)
+ TRACE snes::memory    > Read #0003 from ROM at address $8B91A0
+ TRACE snes::memory    > Read #008D from ROM at address $8B91A1
+ TRACE snes::cpu       > Executing $8B91A1: STA $8B2101 (Absolute)
+ TRACE snes::memory    > Read #0085 from ROM at address $8B91A4
+ TRACE snes::cpu       > Executing $8B91A4: STA $000052 (Direct)
+ TRACE snes::memory    > Writing #F3 to RAM at address $000052
+ TRACE snes::memory    > Read #009C from ROM at address $8B91A6
+ TRACE snes::cpu       > Executing $8B91A6: STZ $8B2102 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91A9
+ TRACE snes::cpu       > Executing $8B91A9: STZ $000053 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000053
+ TRACE snes::memory    > Read #00A9 from ROM at address $8B91AB
+ TRACE snes::memory    > Read #8D80 from ROM at address $8B91AC
+ TRACE snes::cpu       > Executing $8B91AB: LDA #80 (Immediate)
+ TRACE snes::memory    > Read #0080 from ROM at address $8B91AC
+ TRACE snes::memory    > Read #008D from ROM at address $8B91AD
+ TRACE snes::cpu       > Executing $8B91AD: STA $8B2103 (Absolute)
+ TRACE snes::memory    > Read #0085 from ROM at address $8B91B0
+ TRACE snes::cpu       > Executing $8B91B0: STA $000054 (Direct)
+ TRACE snes::memory    > Writing #F0 to RAM at address $000054
+ TRACE snes::memory    > Read #009C from ROM at address $8B91B2
+ TRACE snes::cpu       > Executing $8B91B2: STZ $8B2104 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91B5
+ TRACE snes::cpu       > Executing $8B91B5: STZ $8B2104 (Absolute)
+ TRACE snes::memory    > Read #00A9 from ROM at address $8B91B8
+ TRACE snes::memory    > Read #8D01 from ROM at address $8B91B9
+ TRACE snes::cpu       > Executing $8B91B8: LDA #01 (Immediate)
+ TRACE snes::memory    > Read #0001 from ROM at address $8B91B9
+ TRACE snes::memory    > Read #008D from ROM at address $8B91BA
+ TRACE snes::cpu       > Executing $8B91BA: STA $8B2105 (Absolute)
+ TRACE snes::memory    > Read #0085 from ROM at address $8B91BD
+ TRACE snes::cpu       > Executing $8B91BD: STA $000055 (Direct)
+ TRACE snes::memory    > Writing #F1 to RAM at address $000055
+ TRACE snes::memory    > Read #009C from ROM at address $8B91BF
+ TRACE snes::cpu       > Executing $8B91BF: STZ $8B2106 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91C2
+ TRACE snes::cpu       > Executing $8B91C2: STZ $000057 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000057
+ TRACE snes::memory    > Read #009C from ROM at address $8B91C4
+ TRACE snes::cpu       > Executing $8B91C4: STZ $8B2107 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91C7
+ TRACE snes::cpu       > Executing $8B91C7: STZ $000058 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000058
+ TRACE snes::memory    > Read #009C from ROM at address $8B91C9
+ TRACE snes::cpu       > Executing $8B91C9: STZ $8B2108 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91CC
+ TRACE snes::cpu       > Executing $8B91CC: STZ $000059 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000059
+ TRACE snes::memory    > Read #009C from ROM at address $8B91CE
+ TRACE snes::cpu       > Executing $8B91CE: STZ $8B2109 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91D1
+ TRACE snes::cpu       > Executing $8B91D1: STZ $00005A (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $00005A
+ TRACE snes::memory    > Read #009C from ROM at address $8B91D3
+ TRACE snes::cpu       > Executing $8B91D3: STZ $8B210A (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91D6
+ TRACE snes::cpu       > Executing $8B91D6: STZ $00005C (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $00005C
+ TRACE snes::memory    > Read #009C from ROM at address $8B91D8
+ TRACE snes::cpu       > Executing $8B91D8: STZ $8B210B (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91DB
+ TRACE snes::cpu       > Executing $8B91DB: STZ $00005D (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $00005D
+ TRACE snes::memory    > Read #009C from ROM at address $8B91DD
+ TRACE snes::cpu       > Executing $8B91DD: STZ $8B210C (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B91E0
+ TRACE snes::cpu       > Executing $8B91E0: STZ $00005E (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $00005E
+ TRACE snes::memory    > Read #009C from ROM at address $8B91E2
+ TRACE snes::cpu       > Executing $8B91E2: STZ $8B210D (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91E5
+ TRACE snes::cpu       > Executing $8B91E5: STZ $8B210D (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91E8
+ TRACE snes::cpu       > Executing $8B91E8: STZ $8B210E (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91EB
+ TRACE snes::cpu       > Executing $8B91EB: STZ $8B210E (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91EE
+ TRACE snes::cpu       > Executing $8B91EE: STZ $8B210F (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91F1
+ TRACE snes::cpu       > Executing $8B91F1: STZ $8B210F (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91F4
+ TRACE snes::cpu       > Executing $8B91F4: STZ $8B2110 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91F7
+ TRACE snes::cpu       > Executing $8B91F7: STZ $8B2110 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91FA
+ TRACE snes::cpu       > Executing $8B91FA: STZ $8B2111 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B91FD
+ TRACE snes::cpu       > Executing $8B91FD: STZ $8B2111 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9200
+ TRACE snes::cpu       > Executing $8B9200: STZ $8B2112 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9203
+ TRACE snes::cpu       > Executing $8B9203: STZ $8B2112 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9206
+ TRACE snes::cpu       > Executing $8B9206: STZ $8B2113 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9209
+ TRACE snes::cpu       > Executing $8B9209: STZ $8B2113 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B920C
+ TRACE snes::cpu       > Executing $8B920C: STZ $8B2114 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B920F
+ TRACE snes::cpu       > Executing $8B920F: STZ $8B2114 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9212
+ TRACE snes::cpu       > Executing $8B9212: STZ $8B2115 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9215
+ TRACE snes::cpu       > Executing $8B9215: STZ $8B211A (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B9218
+ TRACE snes::cpu       > Executing $8B9218: STZ $00005F (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $00005F
+ TRACE snes::memory    > Read #009C from ROM at address $8B921A
+ TRACE snes::cpu       > Executing $8B921A: STZ $8B211B (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B921D
+ TRACE snes::cpu       > Executing $8B921D: STZ $8B211C (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9220
+ TRACE snes::cpu       > Executing $8B9220: STZ $8B211D (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9223
+ TRACE snes::cpu       > Executing $8B9223: STZ $8B211E (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9226
+ TRACE snes::cpu       > Executing $8B9226: STZ $8B211F (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B9229
+ TRACE snes::cpu       > Executing $8B9229: STZ $8B2120 (Absolute)
+ TRACE snes::memory    > Read #009C from ROM at address $8B922C
+ TRACE snes::cpu       > Executing $8B922C: STZ $8B2123 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B922F
+ TRACE snes::cpu       > Executing $8B922F: STZ $000060 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000060
+ TRACE snes::memory    > Read #009C from ROM at address $8B9231
+ TRACE snes::cpu       > Executing $8B9231: STZ $8B2124 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B9234
+ TRACE snes::cpu       > Executing $8B9234: STZ $000061 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000061
+ TRACE snes::memory    > Read #009C from ROM at address $8B9236
+ TRACE snes::cpu       > Executing $8B9236: STZ $8B2125 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B9239
+ TRACE snes::cpu       > Executing $8B9239: STZ $000062 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000062
+ TRACE snes::memory    > Read #009C from ROM at address $8B923B
+ TRACE snes::cpu       > Executing $8B923B: STZ $8B2126 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B923E
+ TRACE snes::cpu       > Executing $8B923E: STZ $000063 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000063
+ TRACE snes::memory    > Read #009C from ROM at address $8B9240
+ TRACE snes::cpu       > Executing $8B9240: STZ $8B2127 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B9243
+ TRACE snes::cpu       > Executing $8B9243: STZ $000064 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000064
+ TRACE snes::memory    > Read #009C from ROM at address $8B9245
+ TRACE snes::cpu       > Executing $8B9245: STZ $8B2128 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B9248
+ TRACE snes::cpu       > Executing $8B9248: STZ $000065 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000065
+ TRACE snes::memory    > Read #009C from ROM at address $8B924A
+ TRACE snes::cpu       > Executing $8B924A: STZ $8B2129 (Absolute)
+ TRACE snes::memory    > Read #0064 from ROM at address $8B924D
+ TRACE snes::cpu       > Executing $8B924D: STZ $000066 (Direct)
+ TRACE snes::memory    > Writing #00 to RAM at address $000066
+ TRACE snes::memory    > Read #009C from ROM at address $8B924F
+ TRACE snes::cpu       > Executing $8B924F: STZ $8B212A (Absolute)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0008 from ROM at address $8B9146
+ TRACE snes::cpu       > Executing $8B9146: PHP (Implied)
+ TRACE snes::memory    > Writing #85 to RAM at address $001FFC
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #008B from ROM at address $8B9147
+ TRACE snes::cpu       > Executing $8B9147: PHB (Implied)
+ TRACE snes::memory    > Writing #80 to RAM at address $001FFB
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #004B from ROM at address $8B9148
+ TRACE snes::cpu       > Executing $8B9148: PHK (Implied)
+ TRACE snes::memory    > Writing #8B to RAM at address $001FFA
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00AB from ROM at address $8B9149
+ TRACE snes::cpu       > Executing $8B9149: PLB (Implied)
+ TRACE snes::memory    > Read #8B from RAM at address $001FFA
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00E2 from ROM at address $8B914A
+ TRACE snes::cpu       > Executing $8B914A: SEP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $8B914B
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00A9 from ROM at address $8B914C
+ TRACE snes::cpu       > Executing $8B914C: LDA #8F (Immediate)
+ TRACE snes::memory    > Read #008F from ROM at address $8B914D
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #008D from ROM at address $8B914E
+ TRACE snes::cpu       > Executing $8B914E: STA $8B2100 (Absolute)
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0085 from ROM at address $8B9151
+ TRACE snes::cpu       > Executing $8B9151: STA $000051 (Direct)
+ TRACE snes::memory    > Writing #FF to RAM at address $000051
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #00C2 from ROM at address $8B9153
+ TRACE snes::cpu       > Executing $8B9153: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $8B9154
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #009C from ROM at address $8B9155
+ TRACE snes::cpu       > Executing $8B9155: STZ $8B0590 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0590
+ TRACE snes            > Next
+ TRACE snes::memory    > Read #0022 from ROM at address $8B9158
+ TRACE snes::memory    > Read #0080 from ROM at address $8B915B
+ TRACE snes::cpu       > Executing $8B9158: JSL $808B1A (Long)
+ TRACE snes::memory    > Writing #8B to RAM at address $001FFA
+ TRACE snes::memory    > Writing #91 to RAM at address $001FF9
+ TRACE snes::memory    > Writing #5B to RAM at address $001FF8
+ TRACE snes::memory    > Read #0008 from ROM at address $808B1A
+ TRACE snes::cpu       > Executing $808B1A: PHP (Implied)
+ TRACE snes::memory    > Writing #85 to RAM at address $001FF7
+ TRACE snes::memory    > Read #00C2 from ROM at address $808B1B
+ TRACE snes::memory    > Read #9C30 from ROM at address $808B1C
+ TRACE snes::cpu       > Executing $808B1B: REP #30 (Immediate)
+ TRACE snes::memory    > Read #0030 from ROM at address $808B1C
+ TRACE snes::memory    > Read #009C from ROM at address $808B1D
+ TRACE snes::cpu       > Executing $808B1D: STZ $8B0570 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0570
+ TRACE snes::memory    > Read #009C from ROM at address $808B20
+ TRACE snes::cpu       > Executing $808B20: STZ $8B0572 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0572
+ TRACE snes::memory    > Read #009C from ROM at address $808B23
+ TRACE snes::cpu       > Executing $808B23: STZ $8B0574 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0574
+ TRACE snes::memory    > Read #009C from ROM at address $808B26
+ TRACE snes::cpu       > Executing $808B26: STZ $8B0576 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0576
+ TRACE snes::memory    > Read #009C from ROM at address $808B29
+ TRACE snes::cpu       > Executing $808B29: STZ $8B0578 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0578
+ TRACE snes::memory    > Read #009C from ROM at address $808B2C
+ TRACE snes::cpu       > Executing $808B2C: STZ $8B057A (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B057A
+ TRACE snes::memory    > Read #009C from ROM at address $808B2F
+ TRACE snes::cpu       > Executing $808B2F: STZ $8B057C (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B057C
+ TRACE snes::memory    > Read #009C from ROM at address $808B32
+ TRACE snes::cpu       > Executing $808B32: STZ $8B057E (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B057E
+ TRACE snes::memory    > Read #009C from ROM at address $808B35
+ TRACE snes::cpu       > Executing $808B35: STZ $8B0580 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0580
+ TRACE snes::memory    > Read #009C from ROM at address $808B38
+ TRACE snes::cpu       > Executing $808B38: STZ $8B0582 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0582
+ TRACE snes::memory    > Read #009C from ROM at address $808B3B
+ TRACE snes::cpu       > Executing $808B3B: STZ $8B0584 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0584
+ TRACE snes::memory    > Read #009C from ROM at address $808B3E
+ TRACE snes::cpu       > Executing $808B3E: STZ $8B0586 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0586
+ TRACE snes::memory    > Read #009C from ROM at address $808B41
+ TRACE snes::cpu       > Executing $808B41: STZ $8B0588 (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B0588
+ TRACE snes::memory    > Read #009C from ROM at address $808B44
+ TRACE snes::cpu       > Executing $808B44: STZ $8B058A (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B058A
+ TRACE snes::memory    > Read #009C from ROM at address $808B47
+ TRACE snes::cpu       > Executing $808B47: STZ $8B058C (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B058C
+ TRACE snes::memory    > Read #009C from ROM at address $808B4A
+ TRACE snes::cpu       > Executing $808B4A: STZ $8B058E (Absolute)
+ TRACE snes::memory    > Writing #0000 to RAM at address $8B058E
+ TRACE snes::memory    > Read #0028 from ROM at address $808B4D
+ TRACE snes::cpu       > Executing $808B4D: PLP (Implied)
+ TRACE snes::memory    > Read #85 from RAM at address $001FF7
+ TRACE snes::memory    > Read #006B from ROM at address $808B4E
+ TRACE snes::memory    > Read #00DA from ROM at address $808B4F
+ TRACE snes::cpu       > Executing $808B4F: PHX (Implied)
+ TRACE snes::memory    > Writing #1F to RAM at address $001FF7
+ TRACE snes::memory    > Writing #FC to RAM at address $001FF6
+ TRACE snes::memory    > Read #005A from ROM at address $808B50
+ TRACE snes::cpu       > Executing $808B50: PHY (Implied)
+ TRACE snes::memory    > Writing #00 to RAM at address $001FF5
+ TRACE snes::memory    > Writing #00 to RAM at address $001FF4
+ TRACE snes::memory    > Read #00AC from ROM at address $808B51
+ TRACE snes::cpu       > Executing $808B51: LDY $8B0334 (Absolute)
+ TRACE snes::memory    > Read #0000 from RAM at address $8b0334
+ TRACE snes::memory    > Read #00CA from ROM at address $808B54
+ TRACE snes::cpu       > Executing $808B54: DEX (Implied)
+ TRACE snes::memory    > Read #003C from ROM at address $808B55
+ TRACE snes::cpu       > Executing $808B55: BIT $8B1FFB (Absolute, X)
+The application panicked (crashed).
+Message:  not yet implemented: BIT Not implemented yet
+Location: src\cpu.rs:1535
 
-test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+  ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü BACKTRACE ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+                                Γï« 15 frames hidden Γï«                              
+  16: snes::cpu::execute_instruction<unknown>
+      at C:\Users\kschn\Documents\Gits\snes\src\cpu.rs:1535
+      1533 Γöé             }
+      1534 Γöé         }
+      1535 >         _ => todo!("{} Not implemented yet", instruction.opcode)
+      1536 Γöé     }
+      1537 Γöé     snes.cpu.PC += instruction.length(snes.cpu.P.m, snes.cpu.P.x) as u16;
+  17: snes::debugger::debug_simulation<unknown>
+      at C:\Users\kschn\Documents\Gits\snes\src\debugger.rs:211
+       209 Γöé             snes_sim.cpu.PC += instr.length(snes.cpu.P.m, snes.cpu.P.x) as u16;
+       210 Γöé         } else {
+       211 >             let res = cpu::execute_instruction(&mut snes_sim, &instr)?;
+       212 Γöé         }
+       213 Γöé         if cycle > maxlines {break};
+  18: snes::main<unknown>
+      at C:\Users\kschn\Documents\Gits\snes\src\main.rs:281
+       279 Γöé         } else {
+       280 Γöé             if app.disassembler_ptr == app.disassembled.lines.len() {
+       281 >                 let temp = match debug_simulation(&snes, 100) {
+       282 Γöé                     Ok(r) => r,
+       283 Γöé                     Err(e) => {
+  19: core::ops::function::FnOnce::call_once<enum2$<core::result::Result<tuple$<>,eyre::Report> > (*)(),tuple$<> ><unknown>
+      at /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14\library\core\src\ops\function.rs:250
+  20: std::sys::backtrace::__rust_begin_short_backtrace<enum2$<core::result::Result<tuple$<>,eyre::Report> > (*)(),enum2$<core::result::Result<tuple$<>,eyre::Report> > ><unknown>
+      at /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14\library\std\src\sys\backtrace.rs:154
+                                Γï« 12 frames hidden Γï«                              
 
+Run with COLORBT_SHOW_HIDDEN=1 environment variable to disable frame filtering.
+error: process didn't exit successfully: `target\debug\snes.exe .\super_metroid.sfc` (exit code: 101)

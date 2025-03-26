@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 ahash = "0.8.11"
 better-panic = "0.3.0"
-color-eyre = "0.6.3"
+color-eyre = {version = "0.6.3", features=["capture-spantrace"]}
 crossterm = "0.28.1"
 env_logger = {version = "0.11.3", features = ["unstable-kv"]}
 log = {version = "0.4.21", features = ["release_max_level_info", "kv"]}
