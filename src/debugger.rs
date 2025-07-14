@@ -1,7 +1,10 @@
+use std::fmt::write;
+
 use super::*;
 use crate::cpu::*;
-use color_eyre::Result;
 use ahash::AHashMap;
+use color_eyre::Result;
+use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct InstructionWrapper {
@@ -10,21 +13,21 @@ pub struct InstructionWrapper {
     branchfrom: Vec<u32>,
     branchto: Option<u32>,
     data: u16,
-    instruction: InstructionContext
+    instruction: InstructionContext,
 }
 
 #[derive(Debug, Clone)]
 pub enum Flag {
     BranchStart(u32),
     BranchCont(u32),
-    BranchEnd(u32)
+    BranchEnd(u32),
 }
 
 #[derive(Debug, Clone)]
 pub struct DisassemblerLine {
     pub location: u32,
     pub flags: Vec<Flag>,
-    pub disassembled: InstructionWrapper
+    pub disassembled: InstructionWrapper,
 }
 
 #[derive(Debug, Clone)]
@@ -32,7 +35,7 @@ pub struct DisassemblerContext {
     pub lines: Vec<DisassemblerLine>,
     pub branchtable: Vec<usize>,
     pub branchdepth: usize,
-    pub startloc: u32
+    pub startloc: u32,
 }
 
 impl Default for DisassemblerContext {
@@ -41,47 +44,84 @@ impl Default for DisassemblerContext {
             lines: Vec::default(),
             branchtable: Vec::default(),
             branchdepth: 0,
-            startloc: 0
+            startloc: 0,
         }
     }
 }
 
 impl std::fmt::Display for InstructionWrapper {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.instruction.mode {
             AddrMode::SourceDestination => {
-                write!(f, "${:06X}: {} {:06X}, {:06X} ({})", self.instruction.inst_addr, self.instruction.opcode,
-                 self.instruction.data_addr, self.instruction.dest_addr.unwrap(), self.instruction.mode)
-            },
+                write!(
+                    f,
+                    "${:06X}: {} {:06X}, {:06X} ({})",
+                    self.instruction.inst_addr,
+                    self.instruction.opcode,
+                    self.instruction.data_addr,
+                    self.instruction.dest_addr.unwrap(),
+                    self.instruction.mode
+                )
+            }
             AddrMode::Accumulator | AddrMode::Implied => {
-                write!(f, "${:06X}: {} ({})", self.instruction.inst_addr, self.instruction.opcode, self.instruction.mode)
-            },
-            AddrMode::Immediate => {
-                match &self.instruction.opcode {
-                    OpCode::REP | OpCode::SEP | OpCode::WDM => {
-                        write!(f, "${:06X}: {} #{:02X} ({})", self.instruction.inst_addr, self.instruction.opcode, self.data & 0xFF,
-                        self.instruction.mode)
-                    },
-                    OpCode::PEA | OpCode::PER => {
-                        write!(f, "${:06X}: {} #{:04X} ({})", self.instruction.inst_addr, self.instruction.opcode, self.data,
-                        self.instruction.mode)
-                    }
-                    _ => {
-                        if self.status.m {
-                            write!(f, "${:06X}: {} #{:02X} ({})", self.instruction.inst_addr, self.instruction.opcode, self.data & 0xFF,
-                            self.instruction.mode)
-                        } else {
-                            write!(f, "${:06X}: {} #{:04X} ({})", self.instruction.inst_addr, self.instruction.opcode, self.data,
-                            self.instruction.mode)
-                        }
+                write!(
+                    f,
+                    "${:06X}: {} ({})",
+                    self.instruction.inst_addr, self.instruction.opcode, self.instruction.mode
+                )
+            }
+            AddrMode::Immediate => match &self.instruction.opcode {
+                OpCode::REP | OpCode::SEP | OpCode::WDM => {
+                    write!(
+                        f,
+                        "${:06X}: {} #{:02X} ({})",
+                        self.instruction.inst_addr,
+                        self.instruction.opcode,
+                        self.data & 0xFF,
+                        self.instruction.mode
+                    )
+                }
+                OpCode::PEA | OpCode::PER => {
+                    write!(
+                        f,
+                        "${:06X}: {} #{:04X} ({})",
+                        self.instruction.inst_addr,
+                        self.instruction.opcode,
+                        self.data,
+                        self.instruction.mode
+                    )
+                }
+                _ => {
+                    if self.status.m {
+                        write!(
+                            f,
+                            "${:06X}: {} #{:02X} ({})",
+                            self.instruction.inst_addr,
+                            self.instruction.opcode,
+                            self.data & 0xFF,
+                            self.instruction.mode
+                        )
+                    } else {
+                        write!(
+                            f,
+                            "${:06X}: {} #{:04X} ({})",
+                            self.instruction.inst_addr,
+                            self.instruction.opcode,
+                            self.data,
+                            self.instruction.mode
+                        )
                     }
                 }
-
             },
             _ => {
-                write!(f, "${:06X}: {} ${:06X} ({})", self.instruction.inst_addr, self.instruction.opcode,
-                 self.instruction.data_addr, self.instruction.mode)
+                write!(
+                    f,
+                    "${:06X}: {} ${:06X} ({})",
+                    self.instruction.inst_addr,
+                    self.instruction.opcode,
+                    self.instruction.data_addr,
+                    self.instruction.mode
+                )
             }
         }
     }
@@ -94,6 +134,43 @@ pub struct DebugState {
     e: bool,
 }
 
+#[derive(Debug, Error)]
+pub(crate) enum DisassemblerError {
+    DisassemblyError(DisassemblyError),
+    #[error(transparent)]
+    Other(#[from] color_eyre::eyre::Report),
+}
+
+#[derive(Debug)]
+pub(crate) struct DisassemblyError {
+    pub(crate) instructions: Vec<InstructionWrapper>,
+    pub(crate) status: Console,
+    pub(crate) source: color_eyre::eyre::Error,
+}
+
+impl std::fmt::Display for DisassemblyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let len = &self.instructions.len();
+        for (i, instr) in self.instructions.iter().enumerate() {
+            if i == len - 1 {
+                write!(f, "=> {:} <=\n", instr)?;
+            } else {
+                write!(f, "{:}\n", instr)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for DisassemblerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DisassemblerError::DisassemblyError(e) => e.fmt(f),
+            DisassemblerError::Other(e) => e.fmt(f),
+        }
+    }
+}
+
 fn sets_m(snes: &Console, stack: &Vec<DebugState>, instr: &InstructionContext) -> Result<bool> {
     Ok(match instr.opcode {
         OpCode::SEP => (memory::peek_byte(snes, instr.data_addr)? & 0x20) != 0,
@@ -102,13 +179,17 @@ fn sets_m(snes: &Console, stack: &Vec<DebugState>, instr: &InstructionContext) -
                 if snes.cpu.P.e {
                     (memory::peek_byte(snes, (snes.cpu.S + 1) as u32)? & 0x20) != 0
                 } else {
-                    (memory::peek_byte(snes, u32::from_be_bytes([0x00, 0x00, 0x01,snes.cpu.S as u8])+1)? & 0x20) != 0
+                    (memory::peek_byte(
+                        snes,
+                        u32::from_be_bytes([0x00, 0x00, 0x01, snes.cpu.S as u8]) + 1,
+                    )? & 0x20)
+                        != 0
                 }
             } else {
                 stack.last().unwrap().m
-            } 
+            }
         }
-        _ => false
+        _ => false,
     })
 }
 
@@ -120,13 +201,17 @@ fn clears_m(snes: &Console, stack: &Vec<DebugState>, instr: &InstructionContext)
                 if snes.cpu.P.e {
                     (memory::peek_byte(snes, (snes.cpu.S + 1) as u32)? & 0x20) == 0
                 } else {
-                    (memory::peek_byte(snes, u32::from_be_bytes([0x00, 0x00, 0x01,snes.cpu.S as u8])+1)? & 0x20) == 0
+                    (memory::peek_byte(
+                        snes,
+                        u32::from_be_bytes([0x00, 0x00, 0x01, snes.cpu.S as u8]) + 1,
+                    )? & 0x20)
+                        == 0
                 }
             } else {
                 !stack.last().unwrap().m
-            } 
+            }
         }
-        _ => false
+        _ => false,
     })
 }
 
@@ -138,13 +223,17 @@ fn sets_x(snes: &Console, stack: &Vec<DebugState>, instr: &InstructionContext) -
                 if snes.cpu.P.e {
                     (memory::peek_byte(snes, (snes.cpu.S + 1) as u32)? & 0x10) != 0
                 } else {
-                    (memory::peek_byte(snes, u32::from_be_bytes([0x00, 0x00, 0x01,snes.cpu.S as u8])+1)? & 0x10) != 0
+                    (memory::peek_byte(
+                        snes,
+                        u32::from_be_bytes([0x00, 0x00, 0x01, snes.cpu.S as u8]) + 1,
+                    )? & 0x10)
+                        != 0
                 }
             } else {
                 stack.last().unwrap().x
-            } 
+            }
         }
-        _ => false
+        _ => false,
     })
 }
 
@@ -156,24 +245,31 @@ fn clears_x(snes: &Console, stack: &Vec<DebugState>, instr: &InstructionContext)
                 if snes.cpu.P.e {
                     (memory::peek_byte(snes, (snes.cpu.S + 1) as u32)? & 0x10) == 0
                 } else {
-                    (memory::peek_byte(snes, u32::from_be_bytes([0x00, 0x00, 0x01,snes.cpu.S as u8])+1)? & 0x10) == 0
+                    (memory::peek_byte(
+                        snes,
+                        u32::from_be_bytes([0x00, 0x00, 0x01, snes.cpu.S as u8]) + 1,
+                    )? & 0x10)
+                        == 0
                 }
             } else {
                 !stack.last().unwrap().x
-            } 
+            }
         }
-        _ => false
+        _ => false,
     })
 }
 
 fn clears_e(snes: &Console, instr: &InstructionContext) -> bool {
     match instr.opcode {
         OpCode::XCE => snes.cpu.P.c,
-        _ => false
+        _ => false,
     }
 }
 
-pub fn debug_simulation(snes: &Console, maxlines: usize) -> Result<DisassemblerContext> {
+pub fn debug_simulation(
+    snes: &Console,
+    maxlines: usize,
+) -> Result<DisassemblerContext, DisassemblerError> {
     let mut snes_sim = snes.clone();
     let start = snes.cpu.get_pc();
     let mut cycle = 0;
@@ -189,31 +285,50 @@ pub fn debug_simulation(snes: &Console, maxlines: usize) -> Result<DisassemblerC
         } else {
             None
         };
-        instructions.push(InstructionWrapper{
+        instructions.push(InstructionWrapper {
             location: snes_sim.cpu.get_pc(),
-            status: DebugState { x: snes_sim.cpu.P.x, m: snes_sim.cpu.P.m, e: snes_sim.cpu.P.e },
+            status: DebugState {
+                x: snes_sim.cpu.P.x,
+                m: snes_sim.cpu.P.m,
+                e: snes_sim.cpu.P.e,
+            },
             branchfrom: Vec::<u32>::default(),
             branchto: branchto,
             data: match instr.mode {
                 AddrMode::Immediate => memory::read_word(&snes_sim, instr.data_addr)?,
-                _ => 0x00
+                _ => 0x00,
             },
-            instruction: instr.clone()
-
+            instruction: instr.clone(),
         });
         knowninstructions.insert(snes_sim.cpu.get_pc(), cycle);
-        if instr.opcode.is_branch() || 
-            instr.opcode.is_jump() || 
-            instr.opcode.is_return() || 
-            instr.opcode.is_subroutine() {
+        if instr.opcode.is_branch()
+            || instr.opcode.is_jump()
+            || instr.opcode.is_return()
+            || instr.opcode.is_subroutine()
+        {
             snes_sim.cpu.PC += instr.length(snes.cpu.P.m, snes.cpu.P.x) as u16;
         } else {
-            let res = cpu::execute_instruction(&mut snes_sim, &instr)?;
+            let res = match cpu::execute_instruction(&mut snes_sim, &instr) {
+                Ok(x) => x,
+                Err(e) => {
+                    return Err(DisassemblerError::DisassemblyError(DisassemblyError {
+                        instructions: instructions.clone(),
+                        status: snes_sim.clone(),
+                        source: e,
+                    }))
+                }
+            };
         }
-        if cycle > maxlines {break};
+        if cycle > maxlines {
+            break;
+        };
         cycle += 1;
-        if instr.opcode == OpCode::BRK {break;}
-        if instr.opcode.is_subroutine() {break;}
+        if instr.opcode == OpCode::BRK {
+            break;
+        }
+        if instr.opcode.is_subroutine() {
+            break;
+        }
     }
     'calcbranch: for instr in branchinstructions.iter() {
         let currbranchdest = instructions[*instr].branchto.unwrap();
@@ -227,19 +342,19 @@ pub fn debug_simulation(snes: &Console, maxlines: usize) -> Result<DisassemblerC
             instructions[branchtarget].branchfrom.push(currbranchloc);
         }
     }
-    let disassembler_lines = instructions.iter()
-        .map(|x| {
-            DisassemblerLine {
-                location: x.location,
-                flags: Vec::default(),
-                disassembled: x.clone() 
-            }
-        }).collect();
-    return Ok(DisassemblerContext{
+    let disassembler_lines = instructions
+        .iter()
+        .map(|x| DisassemblerLine {
+            location: x.location,
+            flags: Vec::default(),
+            disassembled: x.clone(),
+        })
+        .collect();
+    return Ok(DisassemblerContext {
         lines: disassembler_lines,
         branchdepth: 0,
         branchtable: branchinstructions,
-        startloc: start
+        startloc: start,
     });
 }
 
@@ -271,32 +386,50 @@ pub fn debug_instructions(snes: &Console, start: u32) -> Result<Vec<InstructionW
             None
         };
 
-        instructions.push(InstructionWrapper{
+        instructions.push(InstructionWrapper {
             location: temppc,
             status: state.clone(),
             branchfrom: Vec::<u32>::default(),
             branchto,
             data: match currinstr.mode {
                 AddrMode::Immediate => memory::read_word(snes, currinstr.data_addr)?,
-                _ => 0
+                _ => 0,
             },
-            instruction: currinstr.clone()
+            instruction: currinstr.clone(),
         });
         knowninstructions.insert(temppc, cycle);
-        if currinstr.opcode.is_jump() {break;}
-        if currinstr.opcode.is_return() {break;}
-        if currinstr.opcode == OpCode::BRK {break;}
+        if currinstr.opcode.is_jump() {
+            break;
+        }
+        if currinstr.opcode.is_return() {
+            break;
+        }
+        if currinstr.opcode == OpCode::BRK {
+            break;
+        }
         if currinstr.opcode == OpCode::PLB {
             dbr = memory::read_byte(&tempsnes, currinstr.data_addr)?
         }
-        if cycle >= 30 {break;}
+        if cycle >= 30 {
+            break;
+        }
         temppc += currinstr.length(state.m, state.x) as u32;
         cycle += 1;
-        if sets_m(&tempsnes, &tempstack, &currinstr)? {state.m = true}
-        if sets_x(&tempsnes, &tempstack, &currinstr)? {state.x = true}
-        if clears_m(&tempsnes, &tempstack, &currinstr)? {state.m = false}
-        if clears_x(&tempsnes, &tempstack, &currinstr)? {state.x = false}
-        if clears_e(&tempsnes, &currinstr) {state.e = false}
+        if sets_m(&tempsnes, &tempstack, &currinstr)? {
+            state.m = true
+        }
+        if sets_x(&tempsnes, &tempstack, &currinstr)? {
+            state.x = true
+        }
+        if clears_m(&tempsnes, &tempstack, &currinstr)? {
+            state.m = false
+        }
+        if clears_x(&tempsnes, &tempstack, &currinstr)? {
+            state.x = false
+        }
+        if clears_e(&tempsnes, &currinstr) {
+            state.e = false
+        }
     }
     for instr in branchinstructions.iter() {
         let currbranchdest = instructions[*instr].branchto.unwrap();
@@ -309,7 +442,11 @@ pub fn debug_instructions(snes: &Console, start: u32) -> Result<Vec<InstructionW
     Ok(instructions)
 }
 
-fn loop_to_target(mut context: DisassemblerContext, start: usize, target: u32) -> DisassemblerContext {
+fn loop_to_target(
+    mut context: DisassemblerContext,
+    start: usize,
+    target: u32,
+) -> DisassemblerContext {
     let mut i;
     let up = if context.lines[start].disassembled.location > target {
         i = start - 1;
@@ -341,7 +478,7 @@ fn loop_to_target(mut context: DisassemblerContext, start: usize, target: u32) -
         }
         match up {
             true => i -= 1,
-            false => i += 1
+            false => i += 1,
         };
     }
     return context;
@@ -349,8 +486,10 @@ fn loop_to_target(mut context: DisassemblerContext, start: usize, target: u32) -
 
 pub fn render_wrapped_instructions(mut context: DisassemblerContext) -> DisassemblerContext {
     for branch in context.branchtable.clone() {
-        if let None = context.lines[branch].disassembled.branchto {continue;};
-        let target=  context.lines[branch].disassembled.branchto.unwrap();
+        if let None = context.lines[branch].disassembled.branchto {
+            continue;
+        };
+        let target = context.lines[branch].disassembled.branchto.unwrap();
         context = loop_to_target(context, branch, target);
     }
     context.branchdepth = 0;
@@ -365,18 +504,18 @@ pub fn render_wrapped_instructions(mut context: DisassemblerContext) -> Disassem
 // ╔║╚
 
 mod tests {
-#![allow(unused_imports)]
-use std::path;
-use color_eyre::Result;
-use crate::cartridge;
-use crate::cpu;
-use crate::debugger::Flag;
-use crate::MMIORegisters;
-use crate::Console;
+    #![allow(unused_imports)]
+    use crate::cartridge;
+    use crate::cpu;
+    use crate::debugger::Flag;
+    use crate::Console;
+    use crate::MMIORegisters;
+    use color_eyre::Result;
+    use std::path;
 
-use super::debug_instructions;
-use super::debug_simulation;
-use super::render_wrapped_instructions;
+    use super::debug_instructions;
+    use super::debug_simulation;
+    use super::render_wrapped_instructions;
     #[test]
     fn test_debugger() -> Result<()> {
         let cartridge = cartridge::load_rom(path::Path::new("./super_metroid.sfc"))?;
@@ -385,21 +524,21 @@ use super::render_wrapped_instructions;
             cpu: cpu::CPU::new(),
             cartridge,
             ram,
-            mmio: MMIORegisters::default()
+            mmio: MMIORegisters::default(),
         };
         snes.cpu.P.e = false;
         snes.cpu.set_pc(0x808423);
         let disassembled = debug_simulation(&snes, 100)?;
         let output = render_wrapped_instructions(disassembled);
         for line in output.lines {
-            for _ in 0..output.branchdepth-line.flags.len() {
+            for _ in 0..output.branchdepth - line.flags.len() {
                 print!(" ");
             }
             for flag in line.flags {
                 match flag {
                     Flag::BranchStart(_) => print!("╔"),
                     Flag::BranchCont(_) => print!("║"),
-                    Flag::BranchEnd(_) => print!("╚")
+                    Flag::BranchEnd(_) => print!("╚"),
                 }
             }
             println!("{:}", line.disassembled);

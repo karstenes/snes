@@ -1,8 +1,8 @@
 use crate::cartridge;
 
 use super::Console;
-use color_eyre::{eyre::bail, eyre::ensure, Result};
 use cartridge::*;
+use color_eyre::{eyre::bail, eyre::ensure, eyre::eyre, Result};
 use log::{error, trace};
 
 pub fn read_word(snes: &Console, addr: u32) -> Result<u16> {
@@ -10,25 +10,25 @@ pub fn read_word(snes: &Console, addr: u32) -> Result<u16> {
     let addr_word = addr & 0xFFFF;
     match addr {
         addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
-            && (addr_word >= 0x4200 && addr_word < 0x4220) => 
+            && (addr_word >= 0x4200 && addr_word < 0x4220) =>
         {
             match addr_word {
-                _ => bail!("Write to unknown/writeonly MMIO Register")
+                _ => bail!("Write to unknown/writeonly MMIO Register"),
             }
-        },
+        }
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
             read_rom_word(&snes.cartridge, addr)
-        },
+        }
         addr if (bank >= 0x7E && bank < 0x80)
             || ((bank < 0x40 || (bank >= 0x80 && bank < 0xC0)) && addr_word < 0x2000) =>
         {
             read_ram_word(&snes.ram, addr)
-        },
+        }
         _ => {
-            bail!("Memory access error! Tried to access {:06X}", addr)
+            return Err(eyre!("Memory access error! Tried to access {:06X}", addr));
         }
     }
 }
@@ -38,12 +38,12 @@ pub fn peek_word(snes: &Console, addr: u32) -> Result<u16> {
     let addr_word = addr & 0xFFFF;
     match addr {
         addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
-            && (addr_word >= 0x4200 && addr_word < 0x4220) => 
+            && (addr_word >= 0x4200 && addr_word < 0x4220) =>
         {
             match addr_word {
-                _ => bail!("Read from unknown/writeonly MMIO Register")
+                _ => bail!("Read from unknown/writeonly MMIO Register"),
             }
-        },
+        }
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
@@ -56,7 +56,7 @@ pub fn peek_word(snes: &Console, addr: u32) -> Result<u16> {
             peek_ram_word(&snes.ram, addr)
         }
         _ => {
-            bail!("Memory access error! Tried to access {:06X}", addr)
+            return Err(eyre!("Memory access error! Tried to access {:06X}", addr));
         }
     }
 }
@@ -65,18 +65,8 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
     let bank = (addr & 0xFF0000) >> 16;
     let addr_word = addr & 0xFFFF;
     match addr {
-        addr if (bank % 0x80) < 0x40
-            && (addr_word >= 0x4200 && addr_word < 0x4220) => 
-        {
+        addr if (bank % 0x80) < 0x40 && (addr_word >= 0x4200 && addr_word < 0x4220) => {
             match addr_word {
-                0x4212 => {
-                    trace!("Unimplemented HBVJOY");
-                    if snes.cpu.P.n {
-                        Ok(0x00)
-                    } else {
-                        Ok(0xFF)
-                    }
-                }
                 0x4210 => {
                     error!("Unimplemented RDNMI");
                     Ok(0x00)
@@ -86,8 +76,12 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
                     Ok(0x00)
                 }
                 0x4212 => {
-                    error!("Unimplemented HBVJOY");
-                    Ok(0x00)
+                    trace!("Unimplemented HBVJOY");
+                    if snes.cpu.P.n {
+                        Ok(0x00)
+                    } else {
+                        Ok(0xFF)
+                    }
                 }
                 0x4213 => {
                     error!("Unimplemented RDIO");
@@ -113,18 +107,16 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
                     error!("Unimplemented joypad #{:04X}", addr_word);
                     Ok(0x00)
                 }
-                _ => bail!("Read from unknown/writeonly MMIO Register")
+                _ => bail!("Read from unknown/writeonly MMIO Register"),
             }
-        },
+        }
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
             read_rom_byte(&snes.cartridge, addr)
         }
-        addr if (bank >= 0x7E && bank < 0x80)
-            || ((bank % 0x80) < 0x40 && addr_word < 0x2000) =>
-        {
+        addr if (bank >= 0x7E && bank < 0x80) || ((bank % 0x80) < 0x40 && addr_word < 0x2000) => {
             read_ram_byte(&snes.ram, addr)
         }
         _ => {
@@ -138,12 +130,12 @@ pub fn peek_byte(snes: &Console, addr: u32) -> Result<u8> {
     let addr_word = addr & 0xFFFF;
     match addr {
         addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
-            && (addr_word >= 0x4200 && addr_word < 0x4220) => 
+            && (addr_word >= 0x4200 && addr_word < 0x4220) =>
         {
             match addr_word {
-                _ => bail!("Read from unknown/writeonly MMIO Register")
+                _ => bail!("Read from unknown/writeonly MMIO Register"),
             }
-        },
+        }
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
@@ -156,7 +148,7 @@ pub fn peek_byte(snes: &Console, addr: u32) -> Result<u8> {
             peek_ram_byte(&snes.ram, addr)
         }
         _ => {
-            bail!("Memory access error! Tried to access {:06X}", addr)
+            return Err(eyre!("Memory access error! Tried to access {:06X}", addr));
         }
     }
 }
@@ -171,7 +163,8 @@ fn peek_ram_word(ram: &Vec<u8>, addr: u32) -> Result<u16> {
         ),
         addr
     );
-    let read_data = ram[(addr & 0x1FFFF) as usize] as u16 + ((ram[(addr & 0x1FFFF) as usize + 1] as u16) << 8);
+    let read_data =
+        ram[(addr & 0x1FFFF) as usize] as u16 + ((ram[(addr & 0x1FFFF) as usize + 1] as u16) << 8);
     Ok(read_data)
 }
 
@@ -199,7 +192,8 @@ fn read_ram_word(ram: &Vec<u8>, addr: u32) -> Result<u16> {
         ),
         addr
     );
-    let read_data = ram[(addr & 0x1FFFF) as usize] as u16 + ((ram[(addr & 0x1FFFF) as usize + 1] as u16) << 8);
+    let read_data =
+        ram[(addr & 0x1FFFF) as usize] as u16 + ((ram[(addr & 0x1FFFF) as usize + 1] as u16) << 8);
     trace!("Read #{:04X} from RAM at address ${:06x}", read_data, addr);
     Ok(read_data)
 }
@@ -458,12 +452,12 @@ pub fn write_word(snes: &mut Console, addr: u32, data: u16) -> Result<()> {
     let addr_word = addr & 0xFFFF;
     match addr {
         addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
-            && (addr_word >= 0x4200 && addr_word < 0x4220) => 
+            && (addr_word >= 0x4200 && addr_word < 0x4220) =>
         {
             match addr_word {
-                _ => bail!("Write byte to unknown/readonly MMIO Register")
+                _ => bail!("Write byte to unknown/readonly MMIO Register"),
             }
-        },
+        }
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
@@ -476,7 +470,7 @@ pub fn write_word(snes: &mut Console, addr: u32, data: u16) -> Result<()> {
             write_ram_word(&mut snes.ram, addr, data)
         }
         _ => {
-            bail!("Memory access error! Tried to access {:06X}", addr)
+            return Err(eyre!("Memory access error! Tried to access {:06X}", addr));
         }
     }
 }
@@ -486,7 +480,7 @@ pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
     let addr_word = addr & 0xFFFF;
     match addr {
         addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
-            && (addr_word >= 0x4200 && addr_word < 0x4220) => 
+            && (addr_word >= 0x4200 && addr_word < 0x4220) =>
         {
             match addr_word {
                 0x4200 => {
@@ -559,31 +553,40 @@ pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
                     snes.mmio.MEMSEL = data;
                     Ok(())
                 }
-                _ => bail!("Write byte to unknown/readonly MMIO Register #{:04X}", addr_word)
+                _ => {
+                    return Err(eyre!(
+                        "Write byte to unknown/readonly MMIO Register #{:04X}",
+                        addr_word
+                    ))
+                }
             }
-        },
+        }
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
-            bail!("Attemped to write {:02X} to ROM at {:06X}", data, addr)
+            return Err(eyre!(
+                "Attemped to write {:02X} to ROM at {:06X}",
+                data,
+                addr
+            ));
         }
         addr if (bank >= 0x7E && bank < 0x80)
             || ((bank < 0x40 || (bank >= 0x80 && bank < 0xC0)) && addr_word < 0x2000) =>
         {
             write_ram_byte(&mut snes.ram, addr, data)
         }
-        addr if (bank % 0x80) < 0x40
-            && addr_word >= 0x2000
-            && addr_word < 0x8000 => {
+        addr if (bank % 0x80) < 0x40 && addr_word >= 0x2000 && addr_word < 0x8000 => {
             write_register_byte(snes, addr, data)
         }
         _ => {
-            bail!("Memory access error! Tried to write to address {:06X}", addr)
+            return Err(eyre!(
+                "Memory access error! Tried to write to address {:06X}",
+                addr
+            ))
         }
     }
 }
-
 
 fn write_ram_word(ram: &mut Vec<u8>, addr: u32, val: u16) -> Result<()> {
     let ram_addr: usize = (addr & 0x200000) as usize;
@@ -614,9 +617,7 @@ fn write_register_byte(snes: &mut Console, addr: u32, val: u8) -> Result<()> {
     let addr_demirror = addr % 0x800000;
     let addr_word: u16 = (addr_demirror & 0xFFFF) as u16;
     ensure!(
-        addr_demirror.to_be_bytes()[1] < 0x40 && 
-        addr_word >= 0x2000 &&
-        addr_word < 0x8000,
+        addr_demirror.to_be_bytes()[1] < 0x40 && addr_word >= 0x2000 && addr_word < 0x8000,
         "Attempted to write to register at ${:06X}, which is out of bounds",
         addr
     );

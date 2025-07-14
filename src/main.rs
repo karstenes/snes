@@ -1,45 +1,41 @@
 #![allow(unused_variables, dead_code, unused_mut)]
 
-mod cpu;
 mod cartridge;
+mod cpu;
 mod debugger;
 mod memory;
 mod registers;
 
 use better_panic::Settings;
 use cartridge::*;
+use color_eyre::{eyre::Report, Result};
 use cpu::*;
-use registers::*;
-use std::env;
-use std::path;
-use tui_input::backend::crossterm::EventHandler;
-use tui_input::Input;
-use color_eyre::{Result, eyre::Report};
-use pretty_env_logger;
-use log::trace;
-use std::{time::Duration, time::Instant};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use debugger::{debug_simulation, render_wrapped_instructions, DisassemblerContext, Flag};
+use log::trace;
+use pretty_env_logger;
 use ratatui::{
-    prelude::*,
     layout::Constraint,
+    prelude::*,
     symbols::border,
     widgets::{block::*, *},
-    
 };
+use registers::*;
+use std::path;
+use std::{default, env};
+use std::{time::Duration, time::Instant};
 use symbols::scrollbar;
-use debugger::{
-    debug_simulation,
-    DisassemblerContext,
-    Flag,
-    render_wrapped_instructions
-};
+use tui_input::backend::crossterm::EventHandler;
+use tui_input::Input;
 
+use crate::debugger::DisassemblerError;
 
 #[derive(Debug, Default)]
 enum InputMode {
-    #[default] Normal,
+    #[default]
+    Normal,
     Edit,
-    Error
+    Error,
 }
 
 #[derive(Debug, Default)]
@@ -52,7 +48,10 @@ pub struct App {
     disassembler_ptr: usize,
     input: Input,
     input_mode: InputMode,
-    subroutine_stack: Vec<u32>
+    subroutine_stack: Vec<u32>,
+    breakpoint: u32,
+    breakpoint_set: bool,
+    run: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -60,7 +59,7 @@ pub struct Console {
     cpu: CPU,
     cartridge: Cartridge,
     ram: Vec<u8>,
-    mmio: MMIORegisters
+    mmio: MMIORegisters,
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -86,13 +85,12 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
-
     let size = f.area();
 
     let chunks = Layout::horizontal([
         Constraint::Percentage(100),
         Constraint::Min(15),
-        Constraint::Min(20)
+        Constraint::Min(20),
     ])
     .split(size);
 
@@ -104,7 +102,6 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
         Layout::vertical([Constraint::Percentage(100)]).split(chunks[0])
     };
 
-    
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::ROUNDED);
@@ -113,14 +110,14 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
 
     for (i, line) in rendertext.iter_mut().enumerate() {
         let mut line_string = String::default();
-        for _ in 0..app.disassembled.branchdepth-app.disassembled.lines[i].flags.len() {
+        for _ in 0..app.disassembled.branchdepth - app.disassembled.lines[i].flags.len() {
             line_string.push(' ');
         }
         for flag in app.disassembled.lines[i].flags.iter() {
             match flag {
                 Flag::BranchStart(_) => line_string.push('┏'),
                 Flag::BranchCont(_) => line_string.push('┃'),
-                Flag::BranchEnd(_) => line_string.push('┗')
+                Flag::BranchEnd(_) => line_string.push('┗'),
             }
         }
         line_string.push_str(format!("{:}", app.disassembled.lines[i].disassembled).as_str());
@@ -130,30 +127,35 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
             *line = Line::from(line_string);
         }
     }
-        
+
     let instr_text = Text::from(rendertext);
 
     let reg_text = Text::from(format!("{}", snes.cpu));
 
-    let stack: Vec<Line> = snes.ram[0x000000..=0x00FFFF].iter()
+    let stack: Vec<Line> = snes.ram[0x000000..=0x00FFFF]
+        .iter()
         .enumerate()
-        .map(|x| if ((x.0 == snes.cpu.S as usize) && !snes.cpu.P.e) 
-            || ((x.0 == ((snes.cpu.S & 0x00FF) | 0x0100) as usize) && snes.cpu.P.e) {
-            Line::from(format!("{:04X}: {:02X}", x.0, x.1)).on_green().black()
-        } else {
-            Line::from(format!("{:04X}: {:02X}", x.0, x.1))
+        .map(|x| {
+            if ((x.0 == snes.cpu.S as usize) && !snes.cpu.P.e)
+                || ((x.0 == ((snes.cpu.S & 0x00FF) | 0x0100) as usize) && snes.cpu.P.e)
+            {
+                Line::from(format!("{:04X}: {:02X}", x.0, x.1))
+                    .on_green()
+                    .black()
+            } else {
+                Line::from(format!("{:04X}: {:02X}", x.0, x.1))
+            }
         })
         .collect();
 
     let stack_text = Text::from(stack);
 
-    app.scroll_state = app.scroll_state
+    app.scroll_state = app
+        .scroll_state
         .content_length(65536)
         .position((app.stack_scroll % 0xFFFF) as usize);
 
-    let instr_par = Paragraph::new(instr_text)
-        .left_aligned()
-        .block(block);
+    let instr_par = Paragraph::new(instr_text).left_aligned().block(block);
 
     let stackblock = Block::default()
         .title_top(Line::from("Stack".bold()).centered())
@@ -164,23 +166,22 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
         .left_aligned()
         .block(stackblock)
         .scroll((app.stack_scroll as u16, 0));
-    
 
     let regblock = Block::default()
         .title_top(Line::from("Registers".bold()).centered())
         .borders(Borders::ALL)
         .border_set(border::ROUNDED);
 
-    let reg_par= Paragraph::new(reg_text)
-        .left_aligned()
-        .block(regblock);
+    let reg_par = Paragraph::new(reg_text).left_aligned().block(regblock);
 
     if app.subroutine_stack.len() > 0 {
         let subroutineblock = Block::default()
             .borders(Borders::ALL)
             .border_set(border::ROUNDED);
-        let subroutine_text = Text::from(format!("Subroutine ${:06X}",
-            app.subroutine_stack.last().unwrap()));
+        let subroutine_text = Text::from(format!(
+            "Subroutine ${:06X}",
+            app.subroutine_stack.last().unwrap()
+        ));
         let subroutine_par = Paragraph::new(subroutine_text)
             .left_aligned()
             .block(subroutineblock);
@@ -197,11 +198,11 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
             .track_symbol(None)
             .begin_symbol(None)
             .end_symbol(None),
-            chunks[1].inner(Margin {
-                vertical: 1,
-                horizontal: 1,
-            }),
-        &mut app.scroll_state
+        chunks[1].inner(Margin {
+            vertical: 1,
+            horizontal: 1,
+        }),
+        &mut app.scroll_state,
     );
     f.render_widget(reg_par, chunks[2]);
 
@@ -213,25 +214,32 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
 
         let area = centered_rect(70, 10, chunks[0]);
         let text = Text::from(app.input.value());
-        let par = Paragraph::new(text)
-            .block(popup);
+        let par = Paragraph::new(text).block(popup);
         f.render_widget(Clear, area);
         f.render_widget(par, area);
     }
 }
 
-fn execute_command(command: &str, snes: &mut Console) -> Result<()> {
-    if command.is_empty() {return Ok(())};
+enum DebuggerCommand {
+    Breakpoint(u32),
+    Default,
+}
+
+fn execute_command(command: &str, snes: &mut Console) -> Result<DebuggerCommand> {
+    if command.is_empty() {
+        return Ok(DebuggerCommand::Default);
+    };
 
     let commandparts: Vec<&str> = command.split_whitespace().collect();
 
-    match commandparts[0].to_lowercase().as_str() {
+    Ok(match commandparts[0].to_lowercase().as_str() {
         "x" => {
             snes.cpu.X = u16::from_str_radix(commandparts[1], 16)?;
+            DebuggerCommand::Default
         }
-        _ => {}
-    }
-    Ok(())
+        "b" => DebuggerCommand::Breakpoint(u32::from_str_radix(commandparts[1], 16)?),
+        _ => DebuggerCommand::Default,
+    })
 }
 
 fn main() -> Result<()> {
@@ -241,10 +249,12 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     let file_path = path::Path::new(&args[1]);
-    
+
     let (mut terminal, tui) = if args.len() <= 2 {
         (Some(ratatui::init()), true)
-    } else { (None, false) };
+    } else {
+        (None, false)
+    };
 
     let cartridge = load_rom(file_path)?;
 
@@ -254,15 +264,15 @@ fn main() -> Result<()> {
         cpu: CPU::new(),
         cartridge,
         ram,
-        mmio: MMIORegisters::default()
+        mmio: MMIORegisters::default(),
     };
     snes.cpu.PC = snes.cartridge.header.interrupt_vectors.reset;
     // let op = memory::read_byte(&snes, snes.cpu.get_pc())?;
     // let instr = cpu::decode_instruction(&snes, op)?;
     // cpu::execute_instruction(&mut snes, &instr)?;
-    
+
     // snes.cpu.PC = snes.cartridge.header.interrupt_vectors.nmi_emu;
-    
+
     let tick_rate = Duration::from_millis(100);
     let mut app = App::default();
     app.disassembler_ptr = 0;
@@ -277,84 +287,119 @@ fn main() -> Result<()> {
             // io::stdin().read_line(&mut trash)?;
             trace!("Next");
         } else {
+            if app.run {
+                let op = memory::read_byte(&snes, snes.cpu.get_pc())?;
+                let instr = cpu::decode_instruction(&snes, op, snes.cpu.get_pc())?;
+                let res = cpu::execute_instruction(&mut snes, &instr)?;
+                app.branch_taken = matches!(res, cpu::CPUExecutionResult::BranchTaken);
+                if matches!(res, cpu::CPUExecutionResult::Jump) {
+                    app.disassembler_ptr = 0;
+                    app.disassembled = DisassemblerContext::default();
+                }
+                if let CPUExecutionResult::Subroutine(addr) = res {
+                    app.disassembled = DisassemblerContext::default();
+                    app.disassembler_ptr = 0;
+                    app.subroutine_stack.push(addr);
+                }
+                if let CPUExecutionResult::Return = res {
+                    app.disassembled = DisassemblerContext::default();
+                    app.disassembler_ptr = 0;
+                    app.subroutine_stack.pop();
+                }
+                app.current_pc = snes.cpu.get_pc();
+                if app.current_pc == app.breakpoint {
+                    app.run = false;
+                }
+                continue 'mainloop;
+            }
             if app.disassembler_ptr == app.disassembled.lines.len() {
                 let temp = match debug_simulation(&snes, 100) {
                     Ok(r) => r,
                     Err(e) => {
                         ratatui::restore();
-                        println!("{:}",e);
-                        return Err(e);
+                        match e {
+                            DisassemblerError::DisassemblyError(de) => {
+                                println!("Error simulating instruction\n{:}", de);
+                                println!("Status:\n{:}", de.status.cpu);
+                                return Err(de.source);
+                            }
+                            DisassemblerError::Other(e) => return Err(e),
+                        }
                     }
                 };
                 app.disassembled = render_wrapped_instructions(temp);
-                app.disassembler_ptr = 0;                
+                app.disassembler_ptr = 0;
             }
-            terminal.as_mut().unwrap().draw(|f| ui(f, &mut app, &snes))?;
+            terminal
+                .as_mut()
+                .unwrap()
+                .draw(|f| ui(f, &mut app, &snes))?;
             let timeout: Duration = tick_rate.saturating_sub(last_tick.elapsed());
             if crossterm::event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match app.input_mode {
-                        InputMode::Normal if key.kind == KeyEventKind::Press => {
-                            match key.code {
-                                KeyCode::Char('q') => break 'mainloop,
-                                KeyCode::Up => {
-                                    app.stack_scroll = app.stack_scroll.wrapping_sub(1);
-                                },
-                                KeyCode::Down => {
-                                    app.stack_scroll = app.stack_scroll.wrapping_add(1);
-                                },
-                                KeyCode::PageUp => {
-                                    app.stack_scroll = app.stack_scroll.wrapping_sub(0x10);
-                                },
-                                KeyCode::PageDown => {
-                                    app.stack_scroll = app.stack_scroll.wrapping_add(0x10);
+                        InputMode::Normal if key.kind == KeyEventKind::Press => match key.code {
+                            KeyCode::Char('q') => break 'mainloop,
+                            KeyCode::Up => {
+                                app.stack_scroll = app.stack_scroll.wrapping_sub(1);
+                            }
+                            KeyCode::Down => {
+                                app.stack_scroll = app.stack_scroll.wrapping_add(1);
+                            }
+                            KeyCode::PageUp => {
+                                app.stack_scroll = app.stack_scroll.wrapping_sub(0x10);
+                            }
+                            KeyCode::PageDown => {
+                                app.stack_scroll = app.stack_scroll.wrapping_add(0x10);
+                            }
+                            KeyCode::Enter => {
+                                if snes.cpu.P.e {
+                                    app.stack_scroll = snes.cpu.S.to_le_bytes()[0] as u16 | 0x0100;
+                                } else {
+                                    app.stack_scroll = snes.cpu.S;
                                 }
-                                KeyCode::Enter => {
-                                    if snes.cpu.P.e {
-                                        app.stack_scroll = snes.cpu.S.to_le_bytes()[0] as u16 | 0x0100;
-                                    } else {
-                                        app.stack_scroll = snes.cpu.S;
-                                    }
-                                },
-                                KeyCode::Char('n') => {
-                                    trace!("Next");
-                                    let op = memory::read_byte(&snes, snes.cpu.get_pc())?;
-                                    let instr = cpu::decode_instruction(&snes, op, snes.cpu.get_pc())?;
-                                    let res = cpu::execute_instruction(&mut snes, &instr)?;
-                                    app.branch_taken = matches!(res, cpu::CPUExecutionResult::BranchTaken);
-                                    if matches!(res, cpu::CPUExecutionResult::Jump) {
-                                        app.disassembler_ptr = 0;
-                                        app.disassembled = DisassemblerContext::default();
-                                    }
-                                    if let CPUExecutionResult::Subroutine(addr) = res {
-                                        app.disassembled = DisassemblerContext::default();
-                                        app.disassembler_ptr = 0;
-                                        app.subroutine_stack.push(addr);
-                                    }
-                                    if let CPUExecutionResult::Return = res {
-                                        app.disassembled = DisassemblerContext::default();
-                                        app.disassembler_ptr = 0;
-                                        app.subroutine_stack.pop();
-                                    }
-                                    app.current_pc = snes.cpu.get_pc();
-                                },
-                                KeyCode::Char('/') => app.input_mode = InputMode::Edit,
-                                _ => {}
+                            }
+                            KeyCode::Char('n') => {
+                                trace!("Next");
+                                let op = memory::read_byte(&snes, snes.cpu.get_pc())?;
+                                let instr = cpu::decode_instruction(&snes, op, snes.cpu.get_pc())?;
+                                let res = cpu::execute_instruction(&mut snes, &instr)?;
+                                app.branch_taken =
+                                    matches!(res, cpu::CPUExecutionResult::BranchTaken);
+                                if matches!(res, cpu::CPUExecutionResult::Jump) {
+                                    app.disassembler_ptr = 0;
+                                    app.disassembled = DisassemblerContext::default();
+                                }
+                                if let CPUExecutionResult::Subroutine(addr) = res {
+                                    app.disassembled = DisassemblerContext::default();
+                                    app.disassembler_ptr = 0;
+                                    app.subroutine_stack.push(addr);
+                                }
+                                if let CPUExecutionResult::Return = res {
+                                    app.disassembled = DisassemblerContext::default();
+                                    app.disassembler_ptr = 0;
+                                    app.subroutine_stack.pop();
+                                }
+                                app.current_pc = snes.cpu.get_pc();
+                            }
+                            KeyCode::Char('c') => app.run = true,
+                            KeyCode::Char('/') => app.input_mode = InputMode::Edit,
+                            _ => {}
+                        },
+                        InputMode::Edit => match key.code {
+                            KeyCode::Esc => app.input_mode = InputMode::Normal,
+                            KeyCode::Enter => {
+                                let cmd = execute_command(app.input.value(), &mut snes)?;
+                                if let DebuggerCommand::Breakpoint(bp) = cmd {
+                                    app.breakpoint = bp;
+                                    app.breakpoint_set = true;
+                                }
+                                app.input.reset();
+                            }
+                            _ => {
+                                app.input.handle_event(&Event::Key(key));
                             }
                         },
-                        InputMode::Edit => {
-                            match key.code {
-                                KeyCode::Esc => app.input_mode = InputMode::Normal,
-                                KeyCode::Enter => {
-                                    execute_command(app.input.value(), &mut snes)?;
-                                    app.input.reset();
-                                    
-                                }
-                                _ => {
-                                    app.input.handle_event(&Event::Key(key));
-                                }
-                            }
-                        }
                         _ => {}
                     }
                 }
