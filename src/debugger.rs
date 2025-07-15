@@ -1,5 +1,3 @@
-use std::fmt::write;
-
 use super::*;
 use crate::cpu::*;
 use ahash::AHashMap;
@@ -327,6 +325,9 @@ pub fn debug_simulation(
             break;
         }
         if instr.opcode.is_subroutine() {
+            break;
+        }
+        if instr.opcode.is_return() {
             break;
         }
     }

@@ -6,9 +6,8 @@ mod debugger;
 mod memory;
 mod registers;
 
-use better_panic::Settings;
 use cartridge::*;
-use color_eyre::{eyre::Report, Result};
+use color_eyre::Result;
 use cpu::*;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use debugger::{debug_simulation, render_wrapped_instructions, DisassemblerContext, Flag};
@@ -22,7 +21,7 @@ use ratatui::{
 };
 use registers::*;
 use std::path;
-use std::{default, env};
+use std::env;
 use std::{time::Duration, time::Instant};
 use symbols::scrollbar;
 use tui_input::backend::crossterm::EventHandler;
@@ -222,6 +221,7 @@ fn ui(f: &mut Frame, app: &mut App, snes: &Console) {
 
 enum DebuggerCommand {
     Breakpoint(u32),
+    NMI,
     Default,
 }
 
@@ -238,6 +238,7 @@ fn execute_command(command: &str, snes: &mut Console) -> Result<DebuggerCommand>
             DebuggerCommand::Default
         }
         "b" => DebuggerCommand::Breakpoint(u32::from_str_radix(commandparts[1], 16)?),
+        "nmi" => DebuggerCommand::NMI,
         _ => DebuggerCommand::Default,
     })
 }
@@ -390,9 +391,17 @@ fn main() -> Result<()> {
                             KeyCode::Esc => app.input_mode = InputMode::Normal,
                             KeyCode::Enter => {
                                 let cmd = execute_command(app.input.value(), &mut snes)?;
-                                if let DebuggerCommand::Breakpoint(bp) = cmd {
-                                    app.breakpoint = bp;
-                                    app.breakpoint_set = true;
+                                match cmd {
+                                    DebuggerCommand::Breakpoint(addr) => {
+                                        app.breakpoint = addr;
+                                        app.breakpoint_set = true;
+                                    },
+                                    DebuggerCommand::NMI => {
+                                        snes.cpu.PC = snes.cartridge.header.interrupt_vectors.nmi;
+                                        snes.cpu.K = 0;
+                                        app.disassembler_ptr = app.disassembled.lines.len()
+                                    },
+                                    DebuggerCommand::Default => {}
                                 }
                                 app.input.reset();
                             }
