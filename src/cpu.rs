@@ -1,4 +1,4 @@
-use crate::memory;
+use crate::memory::{self, read_byte, read_word, write_byte, write_word};
 
 use super::Console;
 use color_eyre::{eyre::bail, eyre::Ok, Result};
@@ -505,7 +505,7 @@ impl CPU {
             PC: 0,
         }
     }
-    fn p_byte(&self) -> u8 {
+    pub fn p_byte(&self) -> u8 {
         let mut p = 0;
         p |= (self.P.n as u8) << 7;
         p |= (self.P.v as u8) << 6;
@@ -517,7 +517,7 @@ impl CPU {
         p |= self.P.c as u8;
         p
     }
-    fn set_p(&mut self, p: u8) {
+    pub fn set_p(&mut self, p: u8) {
         self.P.c = (p & 0b00000001) != 0;
         self.P.z = (p & 0b00000010) != 0;
         self.P.i = (p & 0b00000100) != 0;
@@ -619,19 +619,18 @@ impl<'a> std::fmt::Display for InstructionContextWrapper<'a> {
             AddrMode::SourceDestination => {
                 write!(
                     f,
-                    "${:06X}: {} {:06X}, {:06X} ({})",
+                    "${:06X}: {} {:06X}, {:06X}",
                     self.context.inst_addr,
                     self.context.opcode,
                     self.context.data_addr,
-                    self.context.dest_addr.unwrap(),
-                    self.context.mode
+                    self.context.dest_addr.unwrap()
                 )
             }
             AddrMode::Accumulator | AddrMode::Implied => {
                 write!(
                     f,
-                    "${:06X}: {} ({})",
-                    self.context.inst_addr, self.context.opcode, self.context.mode
+                    "${:06X}: {}",
+                    self.context.inst_addr, self.context.opcode
                 )
             }
             AddrMode::Immediate => match &self.context.opcode {
@@ -639,16 +638,16 @@ impl<'a> std::fmt::Display for InstructionContextWrapper<'a> {
                     let data = memory::peek_byte(self.snes, self.context.data_addr).unwrap();
                     write!(
                         f,
-                        "${:06X}: {} #{:02X} ({})",
-                        self.context.inst_addr, self.context.opcode, data, self.context.mode
+                        "${:06X}: {} #{:02X}",
+                        self.context.inst_addr, self.context.opcode, data
                     )
                 }
                 OpCode::PEA | OpCode::PER => {
                     let data = memory::peek_word(self.snes, self.context.data_addr).unwrap();
                     write!(
                         f,
-                        "${:06X}: {} #{:04X} ({})",
-                        self.context.inst_addr, self.context.opcode, data, self.context.mode
+                        "${:06X}: {} #{:04X}",
+                        self.context.inst_addr, self.context.opcode, data
                     )
                 }
                 _ => {
@@ -656,15 +655,15 @@ impl<'a> std::fmt::Display for InstructionContextWrapper<'a> {
                         let data = memory::peek_byte(self.snes, self.context.data_addr).unwrap();
                         write!(
                             f,
-                            "${:06X}: {} #{:02X} ({})",
-                            self.context.inst_addr, self.context.opcode, data, self.context.mode
+                            "${:06X}: {} #{:02X}",
+                            self.context.inst_addr, self.context.opcode, data
                         )
                     } else {
                         let data = memory::peek_word(self.snes, self.context.data_addr).unwrap();
                         write!(
                             f,
-                            "${:06X}: {} #{:04X} ({})",
-                            self.context.inst_addr, self.context.opcode, data, self.context.mode
+                            "${:06X}: {} #{:04X}",
+                            self.context.inst_addr, self.context.opcode, data
                         )
                     }
                 }
@@ -672,11 +671,8 @@ impl<'a> std::fmt::Display for InstructionContextWrapper<'a> {
             _ => {
                 write!(
                     f,
-                    "${:06X}: {} ${:06X} ({})",
-                    self.context.inst_addr,
-                    self.context.opcode,
-                    self.context.data_addr,
-                    self.context.mode
+                    "${:06X}: {} ${:06X}",
+                    self.context.inst_addr, self.context.opcode, self.context.data_addr,
                 )
             }
         }
@@ -1342,6 +1338,15 @@ fn pull_sword(snes: &mut Console) -> Result<u32> {
     Ok(u32::from_be_bytes([0x00, datah, datam, datal]))
 }
 
+pub fn execute_nmi(snes: &mut Console) -> Result<()> {
+    push_byte(snes, snes.cpu.K)?;
+    push_word(snes, snes.cpu.PC)?;
+    push_byte(snes, snes.cpu.p_byte())?;
+    snes.cpu.PC = snes.cartridge.header.interrupt_vectors.nmi;
+    snes.cpu.K = 0;
+    Ok(())
+}
+
 fn execute_instruction_emu(
     snes: &mut Console,
     instruction: &InstructionContext,
@@ -1402,11 +1407,16 @@ pub fn execute_instruction(
             snes.cpu.set_pc(instruction.data_addr);
             return Ok(CPUExecutionResult::Subroutine(instruction.data_addr));
         }
+        OpCode::JSR => {
+            push_word(snes, (instruction.inst_addr as u16).wrapping_add(2))?;
+            snes.cpu.set_pc(instruction.data_addr);
+            return Ok(CPUExecutionResult::Subroutine(instruction.data_addr));
+        }
         OpCode::RTI => {
             let p = pull_byte(snes)?;
             snes.cpu.set_p(p);
-            snes.cpu.K = pull_byte(snes)?;
             snes.cpu.PC = pull_word(snes)?;
+            snes.cpu.K = pull_byte(snes)?;
             return Ok(CPUExecutionResult::Return);
         }
         OpCode::ADC => {
@@ -1435,6 +1445,39 @@ pub fn execute_instruction(
                 snes.cpu.P.n = snes.cpu.A >= 0b10000000;
                 snes.cpu.P.v = overflow || overflow2;
                 snes.cpu.P.c = overflow || overflow2;
+            }
+        }
+        OpCode::ASL => {
+            if snes.cpu.P.m {
+                if instruction.mode == AddrMode::Accumulator {
+                    let temp = snes.cpu.A << 1;
+                    snes.cpu.P.c = (snes.cpu.A & 0x80) > 0;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = temp >= 0b10000000;
+                    snes.cpu.A = temp;
+                } else {
+                    let data = memory::read_byte(snes, instruction.data_addr)?;
+                    let temp = data << 1;
+                    snes.cpu.P.c = (data & 0x80) > 0;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = temp >= 0b10000000;
+                    memory::write_byte(snes, instruction.data_addr, temp)?;
+                }
+            } else {
+                if instruction.mode == AddrMode::Accumulator {
+                    let temp = snes.cpu.A << 1;
+                    snes.cpu.P.c = (snes.cpu.A & 0x8000) > 0;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = temp >= 0b10000000;
+                    snes.cpu.A = temp;
+                } else {
+                    let data = memory::read_word(snes, instruction.data_addr)?;
+                    let temp = data << 1;
+                    snes.cpu.P.c = (data & 0x8000) > 0;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = temp >= 0b10000000;
+                    memory::write_word(snes, instruction.data_addr, temp)?;
+                }
             }
         }
         OpCode::BCC => {
@@ -1501,6 +1544,9 @@ pub fn execute_instruction(
         OpCode::CLC => {
             snes.cpu.P.c = false;
         }
+        OpCode::CLI => {
+            snes.cpu.P.i = false;
+        }
         OpCode::CMP => {
             if snes.cpu.P.m {
                 let data = memory::read_byte(snes, instruction.data_addr)?;
@@ -1559,7 +1605,6 @@ pub fn execute_instruction(
                 snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
                 snes.cpu.P.z = snes.cpu.A == 0;
             }
-
         }
         OpCode::DEX => {
             if snes.cpu.P.x {
@@ -1632,13 +1677,122 @@ pub fn execute_instruction(
             }
         }
         OpCode::LSR => {
-            if instruction.mode == AddrMode::Accumulator {
-                snes.cpu.A = snes.cpu.A >> 1;
+            if snes.cpu.P.m {
+                if instruction.mode == AddrMode::Accumulator {
+                    snes.cpu.P.c = (snes.cpu.A & 0x01) != 0;
+                    let mut temp_a = (snes.cpu.A & 0xFE) as u8;
+                    temp_a >>= 1;
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= temp_a as u16;
+                    snes.cpu.P.z = temp_a == 0;
+                    snes.cpu.P.n = false;
+                } else {
+                    let mut temp = read_byte(snes, instruction.data_addr)?;
+                    snes.cpu.P.c = (temp & 0x01) != 0;
+                    let mut temp = (temp & 0xFE) as u8;
+                    temp >>= 1;
+                    write_byte(snes, instruction.data_addr, temp)?;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = false;
+                }
             } else {
-                let data = memory::read_word(snes, instruction.data_addr)?;
-                memory::write_word(snes, instruction.data_addr, data >> 1)?;
+                if instruction.mode == AddrMode::Accumulator {
+                    snes.cpu.P.c = (snes.cpu.A & 0x0001) != 0;
+                    let temp_a = (snes.cpu.A & 0xFFFE) >> 1;
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= temp_a;
+                    snes.cpu.P.z = temp_a == 0;
+                    snes.cpu.P.n = false;
+                } else {
+                    let mut temp = read_word(snes, instruction.data_addr)?;
+                    snes.cpu.P.c = (temp & 0x0001) != 0;
+                    let temp = (temp & 0xFFFE) >> 1;
+                    write_word(snes, instruction.data_addr, temp)?;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = false;
+                }
             }
-            snes.cpu.P.c = false;
+        }
+        OpCode::ROL => {
+            if snes.cpu.P.m {
+                let temp_c;
+                if instruction.mode == AddrMode::Accumulator {
+                    let mut temp_a = (snes.cpu.A & 0xFF) as u8;
+                    temp_c = (snes.cpu.A & 0x00F0) as u8;
+                    temp_a = (temp_a & 0x7F) << 1;
+                    temp_a += snes.cpu.P.c as u8;
+                    snes.cpu.P.c = temp_c != 0;
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= temp_a as u16;
+                    snes.cpu.P.z = temp_a == 0;
+                    snes.cpu.P.n = (temp_a & 0x80) != 0;
+                } else {
+                    let mut temp = read_byte(snes, instruction.data_addr)?;
+                    temp_c = (temp & 0xF0) as u8;
+                    temp = (temp & 0x7F) << 1;
+                    temp += snes.cpu.P.c as u8;
+                    snes.cpu.P.c = temp_c != 0;
+                    write_byte(snes, instruction.data_addr, temp)?;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = (temp & 0x80) != 0;
+                }
+            } else {
+                let temp_c;
+                if instruction.mode == AddrMode::Accumulator {
+                    let mut temp_a = snes.cpu.A;
+                    temp_c = temp_a & 0xF000;
+                    temp_a = (temp_a & 0x7FFF) << 1;
+                    temp_a += snes.cpu.P.c as u16;
+                    snes.cpu.P.c = temp_c != 0;
+                    snes.cpu.A = temp_a;
+                    snes.cpu.P.z = temp_a != 0;
+                    snes.cpu.P.n = (temp_a & 0x8000) != 0;
+                } else {
+                    let mut temp = read_word(snes, instruction.data_addr)?;
+                    temp_c = temp & 0xF000;
+                    temp = (temp & 0x7FFF) << 1;
+                    temp += snes.cpu.P.c as u16;
+                    snes.cpu.P.c = temp_c != 0;
+                    write_word(snes, instruction.data_addr, temp)?;
+                    snes.cpu.P.z = temp != 0;
+                    snes.cpu.P.n = (temp & 0x8000) != 0;
+                }
+            }
+        }
+        OpCode::ROR => {
+            if snes.cpu.P.m {
+                if instruction.mode == AddrMode::Accumulator {
+                    snes.cpu.P.c = (snes.cpu.A & 0x01) != 0;
+                    let temp_a = (snes.cpu.A & 0xFE) >> 1;
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= temp_a as u16;
+                    snes.cpu.P.z = temp_a == 0;
+                    snes.cpu.P.n = (temp_a & 0x80) != 0;
+                } else {
+                    let mut temp = memory::read_byte(snes, instruction.data_addr)?;
+                    snes.cpu.P.c = (temp & 0x01) != 0;
+                    let temp = (temp & 0xFE) >> 1;
+                    memory::write_byte(snes, instruction.data_addr, temp)?;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = (temp & 0x80) != 0;
+                }
+            } else {
+                if instruction.mode == AddrMode::Accumulator {
+                    snes.cpu.P.c = (snes.cpu.A & 0x0001) != 0;
+                    let temp_a = (snes.cpu.A & 0xFFFE) >> 1;
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= temp_a;
+                    snes.cpu.P.z = temp_a == 0;
+                    snes.cpu.P.n = (temp_a & 0x8000) != 0;
+                } else {
+                    let mut temp = memory::read_word(snes, instruction.data_addr)?;
+                    snes.cpu.P.c = (temp & 0x0001) != 0;
+                    let temp = (temp & 0xFFFE) >> 1;
+                    memory::write_word(snes, instruction.data_addr, temp)?;
+                    snes.cpu.P.z = temp == 0;
+                    snes.cpu.P.n = (temp & 0x8000) != 0;
+                }
+            }
         }
         OpCode::STA => {
             if snes.cpu.P.m {
@@ -1854,6 +2008,11 @@ pub fn execute_instruction(
                 snes.cpu.P.z = temp == 0;
                 snes.cpu.Y = temp;
             }
+        }
+        OpCode::RTS => {
+            snes.cpu.PC = pull_word(snes)?;
+            snes.cpu.PC += 1;
+            return Ok(CPUExecutionResult::Return);
         }
         OpCode::RTL => {
             let pc_l = pull_byte(snes)?;

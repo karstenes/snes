@@ -34,6 +34,7 @@ pub struct DisassemblerContext {
     pub branchtable: Vec<usize>,
     pub branchdepth: usize,
     pub startloc: u32,
+    pub endloc: u32,
 }
 
 impl Default for DisassemblerContext {
@@ -43,6 +44,7 @@ impl Default for DisassemblerContext {
             branchtable: Vec::default(),
             branchdepth: 0,
             startloc: 0,
+            endloc: 0,
         }
     }
 }
@@ -53,60 +55,51 @@ impl std::fmt::Display for InstructionWrapper {
             AddrMode::SourceDestination => {
                 write!(
                     f,
-                    "${:06X}: {} {:06X}, {:06X} ({})",
+                    "${:06X}: {} {:06X}, {:06X}",
                     self.instruction.inst_addr,
                     self.instruction.opcode,
                     self.instruction.data_addr,
                     self.instruction.dest_addr.unwrap(),
-                    self.instruction.mode
                 )
             }
             AddrMode::Accumulator | AddrMode::Implied => {
                 write!(
                     f,
-                    "${:06X}: {} ({})",
-                    self.instruction.inst_addr, self.instruction.opcode, self.instruction.mode
+                    "${:06X}: {}",
+                    self.instruction.inst_addr, self.instruction.opcode
                 )
             }
             AddrMode::Immediate => match &self.instruction.opcode {
                 OpCode::REP | OpCode::SEP | OpCode::WDM => {
                     write!(
                         f,
-                        "${:06X}: {} #{:02X} ({})",
+                        "${:06X}: {} #{:02X}",
                         self.instruction.inst_addr,
                         self.instruction.opcode,
                         self.data & 0xFF,
-                        self.instruction.mode
                     )
                 }
                 OpCode::PEA | OpCode::PER => {
                     write!(
                         f,
-                        "${:06X}: {} #{:04X} ({})",
-                        self.instruction.inst_addr,
-                        self.instruction.opcode,
-                        self.data,
-                        self.instruction.mode
+                        "${:06X}: {} #{:04X}",
+                        self.instruction.inst_addr, self.instruction.opcode, self.data,
                     )
                 }
                 _ => {
                     if self.status.m {
                         write!(
                             f,
-                            "${:06X}: {} #{:02X} ({})",
+                            "${:06X}: {} #{:02X}",
                             self.instruction.inst_addr,
                             self.instruction.opcode,
                             self.data & 0xFF,
-                            self.instruction.mode
                         )
                     } else {
                         write!(
                             f,
-                            "${:06X}: {} #{:04X} ({})",
-                            self.instruction.inst_addr,
-                            self.instruction.opcode,
-                            self.data,
-                            self.instruction.mode
+                            "${:06X}: {} #{:04X}",
+                            self.instruction.inst_addr, self.instruction.opcode, self.data,
                         )
                     }
                 }
@@ -114,11 +107,8 @@ impl std::fmt::Display for InstructionWrapper {
             _ => {
                 write!(
                     f,
-                    "${:06X}: {} ${:06X} ({})",
-                    self.instruction.inst_addr,
-                    self.instruction.opcode,
-                    self.instruction.data_addr,
-                    self.instruction.mode
+                    "${:06X}: {} ${:06X} ",
+                    self.instruction.inst_addr, self.instruction.opcode, self.instruction.data_addr,
                 )
             }
         }
@@ -321,13 +311,11 @@ pub fn debug_simulation(
             break;
         };
         cycle += 1;
-        if instr.opcode == OpCode::BRK {
-            break;
-        }
-        if instr.opcode.is_subroutine() {
-            break;
-        }
-        if instr.opcode.is_return() {
+        if instr.opcode == OpCode::BRK
+            || instr.opcode.is_return()
+            || instr.opcode.is_subroutine()
+            || instr.opcode == OpCode::BRA
+        {
             break;
         }
     }
@@ -356,6 +344,7 @@ pub fn debug_simulation(
         branchdepth: 0,
         branchtable: branchinstructions,
         startloc: start,
+        endloc: snes_sim.cpu.get_pc(),
     });
 }
 
@@ -406,6 +395,9 @@ pub fn debug_instructions(snes: &Console, start: u32) -> Result<Vec<InstructionW
             break;
         }
         if currinstr.opcode == OpCode::BRK {
+            break;
+        }
+        if currinstr.opcode == OpCode::BRA {
             break;
         }
         if currinstr.opcode == OpCode::PLB {
@@ -510,6 +502,7 @@ mod tests {
     use crate::cpu;
     use crate::debugger::Flag;
     use crate::Console;
+    use crate::DMARegisters;
     use crate::MMIORegisters;
     use color_eyre::Result;
     use std::path;
@@ -519,12 +512,13 @@ mod tests {
     use super::render_wrapped_instructions;
     #[test]
     fn test_debugger() -> Result<()> {
-        let cartridge = cartridge::load_rom(path::Path::new("./super_metroid.sfc"))?;
+        let cartridge = cartridge::load_rom(path::Path::new("./super_metroid.sfc"), false)?;
         let mut ram = vec![0; 0x200000];
         let mut snes = Console {
             cpu: cpu::CPU::new(),
             cartridge,
             ram,
+            dma: DMARegisters::default(),
             mmio: MMIORegisters::default(),
         };
         snes.cpu.P.e = false;

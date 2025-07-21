@@ -2,7 +2,10 @@ use crate::cartridge;
 
 use super::Console;
 use cartridge::*;
-use color_eyre::{eyre::bail, eyre::ensure, eyre::eyre, Result};
+use color_eyre::{
+    eyre::{bail, ensure, eyre, Ok},
+    Result,
+};
 use log::{error, trace};
 
 pub fn read_word(snes: &Console, addr: u32) -> Result<u16> {
@@ -119,9 +122,7 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
         addr if (bank >= 0x7E && bank < 0x80) || ((bank % 0x80) < 0x40 && addr_word < 0x2000) => {
             read_ram_byte(&snes.ram, addr)
         }
-        _ => {
-            bail!("Memory access error! Tried to access {:06X}", addr)
-        }
+        _ => return Err(eyre!("Memory access error! Tried to access {:06X}", addr)),
     }
 }
 
@@ -410,6 +411,18 @@ fn read_rom_byte(rom: &cartridge::Cartridge, addr: u32) -> Result<u8> {
                 addr,
                 rom.header.rom_size
             );
+            ensure!(
+                rom_addr < rom.rom_data.len(),
+                concat!(
+                    "Attempted to access ROM address ${:06X} at {:06X}, ",
+                    "which is outside the bounds of the rom vector with size {:06X}\n",
+                    "rom has size {:}kB"
+                ),
+                rom_addr,
+                addr,
+                rom.rom_data.len(),
+                rom.header.rom_size
+            );
             let read_data = rom.rom_data[rom_addr];
             trace!("Read #{:04X} from ROM at address ${:06X}", read_data, addr);
             Ok(read_data)
@@ -456,6 +469,52 @@ pub fn write_word(snes: &mut Console, addr: u32, data: u16) -> Result<()> {
         {
             match addr_word {
                 _ => bail!("Write byte to unknown/readonly MMIO Register"),
+            }
+        }
+        addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
+            && (addr_word >= 0x4300 && addr_word < 0x4380) =>
+        {
+            let dma_no = ((addr_word & 0x00F0) >> 4) as usize;
+            ensure!(
+                dma_no < 8,
+                "DMA number {} out of bounds! Valid range is 0-7.",
+                dma_no
+            );
+            let dma_reg = addr_word & 0x000F;
+            match dma_reg {
+                0x2 => {
+                    trace!(
+                        "Writing #{:04X} to DMA Source Address for DMA {}",
+                        data,
+                        dma_no
+                    );
+                    snes.dma.A1TnL[dma_no] = (data & 0x00FF) as u8;
+                    snes.dma.A1TnH[dma_no] = ((data & 0xFF00) >> 8) as u8;
+                    Ok(())
+                }
+                0x5 => {
+                    trace!("Writing #{:04X} to DMA Length for DMA {}", data, dma_no);
+                    snes.dma.DASnL[dma_no] = (data & 0x00FF) as u8;
+                    snes.dma.DASnH[dma_no] = ((data & 0xFF00) >> 8) as u8;
+                    Ok(())
+                }
+                0x8 => {
+                    trace!(
+                        "Writing #{:04X} to HDMA table address for DMA {}",
+                        data,
+                        dma_no
+                    );
+                    snes.dma.A2TnL[dma_no] = (data & 0x00FF) as u8;
+                    snes.dma.A2TnH[dma_no] = ((data & 0xFF00) >> 8) as u8;
+                    Ok(())
+                }
+                _ => {
+                    return Err(eyre!(
+                        "Word write to byte width DMA register {:04X} at {:06X}",
+                        dma_reg,
+                        addr
+                    ))
+                }
             }
         }
         addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
@@ -540,12 +599,12 @@ pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
                 }
                 0x420B => {
                     trace!("Writing #{:02X} to MDMAEN", data);
-                    snes.mmio.MDMAEN = data;
+                    snes.dma.MDMAEN = data;
                     Ok(())
                 }
                 0x420C => {
                     trace!("Writing #{:02X} to HDMAEN", data);
-                    snes.mmio.HDMAEN = data;
+                    snes.dma.HDMAEN = data;
                     Ok(())
                 }
                 0x420D => {
@@ -558,6 +617,86 @@ pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
                         "Write byte to unknown/readonly MMIO Register #{:04X}",
                         addr_word
                     ))
+                }
+            }
+        }
+        addr if ((bank < 0x40) || (bank >= 0x80 && bank < 0xC0))
+            && (addr_word >= 0x4300 && addr_word < 0x4380) =>
+        {
+            let dma_no = ((addr_word & 0x00F0) >> 4) as usize;
+            ensure!(
+                dma_no < 8,
+                "DMA number {} out of bounds! Valid range is 0-7.",
+                dma_no
+            );
+            let dma_reg = addr_word & 0x000F;
+            match dma_reg {
+                0x0 => {
+                    trace!("Writing #{:02X} to DMAP {}", data, dma_no);
+                    snes.dma.DMAPn[dma_no] = data;
+                    Ok(())
+                }
+                0x1 => {
+                    trace!("Writing #{:02X} to BBBAD {}", data, dma_no);
+                    snes.dma.BBADn[dma_no] = data;
+                    Ok(())
+                }
+                0x2 => {
+                    trace!("Writing #{:02X} to A1TnL {}", data, dma_no);
+                    snes.dma.A1TnL[dma_no] = data;
+                    Ok(())
+                }
+                0x3 => {
+                    trace!("Writing #{:02X} to A1TnH {}", data, dma_no);
+                    snes.dma.A1TnH[dma_no] = data;
+                    Ok(())
+                }
+                0x4 => {
+                    trace!("Writing #{:02X} to A1B {}", data, dma_no);
+                    snes.dma.A1nB[dma_no] = data;
+                    Ok(())
+                }
+                0x5 => {
+                    trace!("Writing #{:02X} to DASnL {}", data, dma_no);
+                    snes.dma.DASnL[dma_no] = data;
+                    Ok(())
+                }
+                0x6 => {
+                    trace!("Writing #{:02X} to DASnH {}", data, dma_no);
+                    snes.dma.DASnH[dma_no] = data;
+                    Ok(())
+                }
+                0x7 => {
+                    trace!("Writing #{:02X} to DASB {}", data, dma_no);
+                    snes.dma.DASBn[dma_no] = data;
+                    Ok(())
+                }
+                0x8 => {
+                    trace!("Writing #{:02X} to A2TnL {}", data, dma_no);
+                    snes.dma.A2TnL[dma_no] = data;
+                    Ok(())
+                }
+                0x9 => {
+                    trace!("Writing #{:02X} to A2TnH {}", data, dma_no);
+                    snes.dma.A2TnH[dma_no] = data;
+                    Ok(())
+                }
+                0xA => {
+                    trace!("Writing #{:02x} to NLTR {}", data, dma_no);
+                    snes.dma.NLTRn[dma_no] = data;
+                    Ok(())
+                }
+                0xB | 0xF => {
+                    trace!("Writing #{:02X} to unused {}", data, dma_no);
+                    snes.dma.UNUSEDn[dma_no] = data;
+                    Ok(())
+                }
+                _ => {
+                    return Err(eyre!(
+                        "Write byte to unknown/readonly DMA register {:04X} at {:06X}",
+                        dma_reg,
+                        addr
+                    ));
                 }
             }
         }

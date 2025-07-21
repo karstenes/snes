@@ -1,5 +1,5 @@
 use std::{fs, path::Path, str};
-use color_eyre::{eyre::{bail, Context}, Result};
+use color_eyre::{eyre::{bail, Context, eyre}, Result};
 use num_enum::TryFromPrimitive;
 use log::{info, debug};
 
@@ -116,7 +116,7 @@ pub struct Cartridge {
     pub rom_data: Vec<u8>
 }
 
-fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
+fn load_rom_header(file: &Vec<u8>, bypass_checksum: bool) -> Result<RomHeader> {
     if file.len() % 1024 != 0 {
         debug!("Rom Dumper header found in file.");
     }
@@ -147,10 +147,6 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
     };
     
 
-    // let checksum: u16 = file
-    //                     .iter()
-    //                     .fold(0u16, |sum, i| sum.wrapping_add(*i as u16));
-
     let checksum_complement = checksum ^ 0xFFFF;
 
     debug!("Checksum {:04X} and Complement {:04X}", checksum, checksum_complement);
@@ -162,8 +158,8 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
         (file[0xFFDE] as u16) | (file[0xFFDF] as u16) << 8 == checksum {
             MapMode::HiROM
     } else {
-        if file.len() < 0x40FFDF {
-            bail!("No checksum found in rom file. Is this a valid SNES rom?")
+        if file.len() < 0x40FFDF && !bypass_checksum {
+            return Err(eyre!("No checksum found in rom file. Is this a valid SNES rom?"));
         }
         MapMode::ExHiROM
     };
@@ -176,9 +172,8 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
         MapMode::ExHiROM => &file[0x40FFC0..=0x40FFFF]
     };
 
-    let title = str::from_utf8(&header_slice[0..=0x14])
-        .context("Failed to convert cartridge title to a rust str")?
-        .to_string();
+    let title = String::from_utf8(header_slice[0..=0x14].to_vec())
+        .with_context(|| format!("Failed to convert cartridge title to a rust str: {:?}", &header_slice[0..=0x14]))?;
 
     info!("ROM is \"{:}\"", title.trim_end());
 
@@ -301,11 +296,11 @@ fn load_rom_header(file: &Vec<u8>) -> Result<RomHeader> {
     return Ok(header);
 }
 
-pub fn load_rom(rom_file: &Path) -> Result<Cartridge> {
+pub fn load_rom(rom_file: &Path, bypass_checksum: bool) -> Result<Cartridge> {
     let file: Vec<u8> = fs::read(&rom_file)
         .wrap_err_with(|| format!("Failed to read rom file {}", rom_file.display()))?;
 
-    let header = load_rom_header(&file)?;    
+    let header = load_rom_header(&file, bypass_checksum)?;    
 
     let cart = Cartridge {
         header,

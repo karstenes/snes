@@ -1,63 +1,36 @@
-   Compiling snes v0.1.0 (C:\Users\kschn\Documents\Gits\snes)
-warning: unused import: `std::fmt::write`
- --> src\debugger.rs:1:5
-  |
-1 | use std::fmt::write;
-  |     ^^^^^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_imports)]` on by default
-
-warning: unused import: `better_panic::Settings`
- --> src/main.rs:9:5
-  |
-9 | use better_panic::Settings;
-  |     ^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused import: `eyre::Report`
-  --> src/main.rs:11:18
+warning: unused import: `formatted_builder`
+  --> src/main.rs:16:50
    |
-11 | use color_eyre::{eyre::Report, Result};
-   |                  ^^^^^^^^^^^^
-
-warning: unused import: `default`
-  --> src/main.rs:25:11
+16 | use pretty_env_logger::{env_logger::fmt::Target, formatted_builder};
+   |                                                  ^^^^^^^^^^^^^^^^^
    |
-25 | use std::{default, env};
-   |           ^^^^^^^
+   = note: `#[warn(unused_imports)]` on by default
 
-warning: unused `Result` that must be used
-    --> src\cpu.rs:1513:17
-     |
-1513 |                 memory::write_word(snes, instruction.data_addr, snes.cpu.X);
-     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     |
-     = note: this `Result` may be an `Err` variant, which should be handled
-     = note: `#[warn(unused_must_use)]` on by default
-help: use `let _ = ...` to ignore the resulting value
-     |
-1513 |                 let _ = memory::write_word(snes, instruction.data_addr, snes.cpu.X);
-     |                 +++++++
-
-warning: unused `Result` that must be used
-    --> src\cpu.rs:1520:17
-     |
-1520 |                 memory::write_word(snes, instruction.data_addr, snes.cpu.Y);
-     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     |
-     = note: this `Result` may be an `Err` variant, which should be handled
-help: use `let _ = ...` to ignore the resulting value
-     |
-1520 |                 let _ = memory::write_word(snes, instruction.data_addr, snes.cpu.Y);
-     |                 +++++++
-
-warning: `snes` (bin "snes") generated 6 warnings (run `cargo fix --bin "snes"` to apply 4 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.38s
+warning: `snes` (bin "snes") generated 1 warning (run `cargo fix --bin "snes"` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
      Running `target\debug\snes.exe .\super_metroid.sfc`
  ERROR snes::memory > Joypads umimplemented!
+ ERROR snes::memory > Unimplemented RDNMI
+ ERROR snes::memory > Unimplemented RDNMI
+ ERROR snes::memory > Unimplemented RDNMI
 The application panicked (crashed).
-Message:  not yet implemented: DEC Not implemented yet
-Location: src\cpu.rs:1706
+Message:  not yet implemented: TSB Not implemented yet
+Location: src\cpu.rs:2036
 
-Backtrace omitted. Run with RUST_BACKTRACE=1 environment variable to display it.
+  ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü BACKTRACE ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+                                Γï« 15 frames hidden Γï«                              
+  16: snes::cpu::execute_instruction<unknown>
+      at C:\Users\kschn\Documents\gits\snes\src\cpu.rs:2036
+  17: snes::debugger::debug_simulation<unknown>
+      at C:\Users\kschn\Documents\gits\snes\src\debugger.rs:299
+  18: snes::main<unknown>
+      at C:\Users\kschn\Documents\gits\snes\src\main.rs:377
+  19: core::ops::function::FnOnce::call_once<enum2$<core::result::Result<tuple$<>,eyre::Report> > (*)(),tuple$<> ><unknown>
+      at /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14\library\core\src\ops\function.rs:250
+  20: std::sys::backtrace::__rust_begin_short_backtrace<enum2$<core::result::Result<tuple$<>,eyre::Report> > (*)(),enum2$<core::result::Result<tuple$<>,eyre::Report> > ><unknown>
+      at /rustc/f6e511eec7342f59a25f7c0534f1dbea00d01b14\library\std\src\sys\backtrace.rs:154
+                                Γï« 12 frames hidden Γï«                              
+
+Run with COLORBT_SHOW_HIDDEN=1 environment variable to disable frame filtering.
 Run with RUST_BACKTRACE=full to include source snippets.
 error: process didn't exit successfully: `target\debug\snes.exe .\super_metroid.sfc` (exit code: 101)
