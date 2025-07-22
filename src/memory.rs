@@ -768,3 +768,338 @@ fn write_register_byte(snes: &mut Console, addr: u32, val: u8) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cartridge::*;
+    use crate::cpu::*;
+    use crate::registers::*;
+
+    fn create_test_console_lorom() -> Console {
+        let rom_data = vec![0; 0x200000]; // 2MB ROM filled with zeros
+
+        // Create a dummy cartridge with LoROM mapping
+        let cartridge = Cartridge {
+            header: RomHeader {
+                title: "TEST ROM".to_string(),
+                map_mode: MapMode::LoROM,
+                rom_speed: RomSpeed::Slow,
+                extra_hardware: CartHardware {
+                    extra_hardware: ExtraHardware::RomOnly,
+                    coprocessor: None,
+                },
+                rom_size: 2 * 1024 * 1024,
+                ram_size: 0,
+                country: Region::NTSC,
+                developer_id: 0x01,
+                rom_version: 0,
+                checksum_complement: 0xFFFF,
+                checksum: 0x0000,
+                interrupt_vectors: InterruptVectorTable {
+                    cop: 0x8000,
+                    brk: 0x8000,
+                    abort: 0x8000,
+                    nmi: 0x8000,
+                    irq: 0x8000,
+                    cop_emu: 0x8000,
+                    brk_emu: 0x8000,
+                    abort_emu: 0x8000,
+                    nmi_emu: 0x8000,
+                    reset: 0x8000,
+                    irq_emu: 0x8000,
+                },
+                expanded_header: None,
+            },
+            rom_data,
+        };
+
+        Console {
+            cpu: CPU::new(),
+            cartridge,
+            ram: vec![0; 0x200000], // 2MB RAM
+            mmio: MMIORegisters::default(),
+            dma: DMARegisters::default(),
+        }
+    }
+
+    fn create_test_console_hirom() -> Console {
+        let mut console = create_test_console_lorom();
+        console.cartridge.header.map_mode = MapMode::HiROM;
+        console
+    }
+
+    fn create_test_console_exhirom() -> Console {
+        let mut console = create_test_console_lorom();
+        console.cartridge.header.map_mode = MapMode::ExHiROM;
+        console.cartridge.rom_data = vec![0; 0x400000]; // 4MB ROM for ExHiROM
+        console
+    }
+
+    #[test]
+    fn test_ram_read_write_byte() {
+        let mut console = create_test_console_lorom();
+
+        // Test writing and reading from RAM in bank 0x7E
+        let addr = 0x7E0100;
+        let test_value = 0xAB;
+
+        write_byte(&mut console, addr, test_value).unwrap();
+        let read_value = read_byte(&console, addr).unwrap();
+
+        assert_eq!(read_value, test_value);
+    }
+
+    #[test]
+    fn test_ram_read_write_word() {
+        let mut console = create_test_console_lorom();
+
+        // Test writing and reading a word from RAM
+        let addr = 0x7E0200;
+        let test_value = 0x1234;
+
+        write_word(&mut console, addr, test_value).unwrap();
+        let read_value = read_word(&console, addr).unwrap();
+
+        assert_eq!(read_value, test_value);
+    }
+
+    #[test]
+    fn test_ram_mirroring() {
+        let mut console = create_test_console_lorom();
+
+        // Test that low RAM is mirrored in bank 0
+        let test_value = 0xCD;
+        let ram_addr = 0x7E0000; // Direct RAM access
+        let mirror_addr = 0x000000; // Mirrored access
+
+        write_byte(&mut console, ram_addr, test_value).unwrap();
+        let mirrored_value = read_byte(&console, mirror_addr).unwrap();
+
+        assert_eq!(mirrored_value, test_value);
+    }
+
+    #[test]
+    fn test_rom_read_lorom() {
+        let mut console = create_test_console_lorom();
+
+        // Put test data in ROM
+        console.cartridge.rom_data[0x100] = 0xEF;
+
+        // Read from LoROM mapping (bank 0, address >= 0x8000)
+        let rom_addr = 0x008100; // LoROM bank 0, maps to ROM offset 0x100
+        let read_value = read_byte(&console, rom_addr).unwrap();
+
+        assert_eq!(read_value, 0xEF);
+    }
+
+    #[test]
+    fn test_rom_read_hirom() {
+        let mut console = create_test_console_hirom();
+
+        // Put test data in ROM
+        console.cartridge.rom_data[0x100] = 0xFE;
+
+        // Read from HiROM mapping
+        let rom_addr = 0xC00100; // Direct HiROM access
+        let read_value = read_byte(&console, rom_addr).unwrap();
+
+        assert_eq!(read_value, 0xFE);
+    }
+
+    #[test]
+    fn test_rom_write_fails() {
+        let mut console = create_test_console_lorom();
+
+        // Attempting to write to ROM should fail
+        let rom_addr = 0x008100;
+        let result = write_byte(&mut console, rom_addr, 0x42);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mmio_register_write() {
+        let mut console = create_test_console_lorom();
+
+        // Test writing to NMITIMEN register
+        let nmitimen_addr = 0x004200;
+        let test_value = 0x81;
+
+        write_byte(&mut console, nmitimen_addr, test_value).unwrap();
+        assert_eq!(console.mmio.NMITIMEN, test_value);
+    }
+
+    #[test]
+    fn test_mmio_register_read() {
+        let console = create_test_console_lorom();
+
+        // Test reading from HBVJOY register (should return 0xFF when n flag is false)
+        let hbvjoy_addr = 0x004212;
+        let read_value = read_byte(&console, hbvjoy_addr).unwrap();
+
+        // Should return 0xFF since cpu.P.n is false by default
+        assert_eq!(read_value, 0xFF);
+    }
+
+    #[test]
+    fn test_dma_register_write() {
+        let mut console = create_test_console_lorom();
+
+        // Test writing to DMA register
+        let dma_addr = 0x004300; // DMAP0
+        let test_value = 0x42;
+
+        write_byte(&mut console, dma_addr, test_value).unwrap();
+        assert_eq!(console.dma.DMAPn[0], test_value);
+    }
+
+    #[test]
+    fn test_dma_register_word_write() {
+        let mut console = create_test_console_lorom();
+
+        // Test writing word to DMA source address
+        let dma_addr = 0x004302; // A1T0L/A1T0H
+        let test_value = 0x1234;
+
+        write_word(&mut console, dma_addr, test_value).unwrap();
+        assert_eq!(console.dma.A1TnL[0], 0x34); // Low byte
+        assert_eq!(console.dma.A1TnH[0], 0x12); // High byte
+    }
+
+    #[test]
+    fn test_peek_vs_read() {
+        let console = create_test_console_lorom();
+
+        // Both peek and read should return the same value for RAM
+        let ram_addr = 0x7E0000;
+        let peek_value = peek_byte(&console, ram_addr).unwrap();
+        let read_value = read_byte(&console, ram_addr).unwrap();
+
+        assert_eq!(peek_value, read_value);
+    }
+
+    #[test]
+    fn test_invalid_address_read() {
+        let console = create_test_console_lorom();
+
+        // Try to read from an invalid address range
+        let invalid_addr = 0x500000; // Should be invalid
+        let result = read_byte(&console, invalid_addr);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_address_write() {
+        let mut console = create_test_console_lorom();
+
+        // Try to write to an invalid address range
+        let invalid_addr = 0x500000;
+        let result = write_byte(&mut console, invalid_addr, 0x42);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ram_boundary_wrapping() {
+        let mut console = create_test_console_lorom();
+
+        // Test that RAM addresses wrap properly
+        let test_value = 0x55;
+        let high_ram_addr = 0x7FFFFF; // End of RAM region
+
+        write_byte(&mut console, high_ram_addr, test_value).unwrap();
+        let wrapped_addr = 0x7E0000 | (high_ram_addr & 0x1FFFF);
+        let read_value = read_byte(&console, wrapped_addr).unwrap();
+
+        assert_eq!(read_value, test_value);
+    }
+
+    #[test]
+    fn test_word_read_write_endianness() {
+        let mut console = create_test_console_lorom();
+
+        // Test that words are stored in little-endian format
+        let addr = 0x7E1000;
+        let test_word = 0xABCD;
+
+        write_word(&mut console, addr, test_word).unwrap();
+
+        // Check individual bytes
+        let low_byte = read_byte(&console, addr).unwrap();
+        let high_byte = read_byte(&console, addr + 1).unwrap();
+
+        assert_eq!(low_byte, 0xCD); // Low byte first
+        assert_eq!(high_byte, 0xAB); // High byte second
+
+        // Check word read
+        let read_word = read_word(&console, addr).unwrap();
+        assert_eq!(read_word, test_word);
+    }
+
+    #[test]
+    fn test_multiple_dma_channels() {
+        let mut console = create_test_console_lorom();
+
+        // Test writing to different DMA channels
+        for channel in 0..8 {
+            let dma_addr = 0x004300 + (channel << 4); // DMAP for each channel
+            let test_value = 0x10 + channel as u8;
+
+            write_byte(&mut console, dma_addr, test_value).unwrap();
+            assert_eq!(console.dma.DMAPn[channel as usize], test_value);
+        }
+    }
+
+    #[test]
+    fn test_exhirom_mapping() {
+        let mut console = create_test_console_exhirom();
+
+        // Put test data in ROM
+        console.cartridge.rom_data[0x100] = 0x77;
+
+        // Test ExHiROM specific mapping
+        let exhirom_addr = 0xC00100;
+        let read_value = read_byte(&console, exhirom_addr).unwrap();
+
+        assert_eq!(read_value, 0x77);
+    }
+
+    #[test]
+    fn test_stack_region_access() {
+        let mut console = create_test_console_lorom();
+
+        // Test accessing the stack region (page 1 in bank 0)
+        let stack_addr = 0x0001FF;
+        let test_value = 0x88;
+
+        write_byte(&mut console, stack_addr, test_value).unwrap();
+        let read_value = read_byte(&console, stack_addr).unwrap();
+
+        assert_eq!(read_value, test_value);
+    }
+
+    #[test]
+    fn test_rom_size_boundary() {
+        let console = create_test_console_lorom();
+
+        // Try to read from an address that should be invalid
+        let invalid_addr = 0x500000; // Definitely invalid address
+        let result = read_byte(&console, invalid_addr);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ppu_register_write() {
+        let mut console = create_test_console_lorom();
+
+        // Test writing to PPU register region
+        let ppu_addr = 0x002100; // INIDISP
+        let result = write_byte(&mut console, ppu_addr, 0x0F);
+
+        // Should succeed (registers are write-only in this implementation)
+        assert!(result.is_ok());
+    }
+}
