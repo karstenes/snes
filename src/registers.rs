@@ -49,7 +49,7 @@ pub struct PPURegisters {
     pub OPHCT: u16,
     pub OPVCT: u16,
     pub STAT77: u8,
-    pub STAT78: u8
+    pub STAT78: u8,
 }
 
 #[allow(non_snake_case)]

@@ -519,34 +519,453 @@ mod tests {
     use super::debug_instructions;
     use super::debug_simulation;
     use super::render_wrapped_instructions;
-    #[test]
-    fn test_debugger() -> Result<()> {
-        let cartridge = cartridge::load_rom(path::Path::new("./super_metroid.sfc"), false)?;
-        let mut ram = vec![0; 0x200000];
-        let mut snes = Console {
+    use super::*;
+
+    fn create_test_console() -> Console {
+        // Create a minimal ROM with some test instructions
+        let mut rom_data = vec![0u8; 0x20000]; // 128KB ROM
+        
+        // Add some simple 65C816 instructions for testing
+        // LDA #$1234 (A9 34 12 in 16-bit mode)
+        rom_data[0x0000] = 0xA9; // LDA immediate
+        rom_data[0x0001] = 0x34; // Low byte
+        rom_data[0x0002] = 0x12; // High byte
+        
+        // NOP (EA)
+        rom_data[0x0003] = 0xEA; // NOP
+        
+        // BRA +2 (80 02)
+        rom_data[0x0004] = 0x80; // BRA
+        rom_data[0x0005] = 0x02; // Relative offset +2
+        
+        // Target of branch
+        rom_data[0x0008] = 0xEA; // NOP
+        
+        // BRK (00)
+        rom_data[0x0009] = 0x00; // BRK
+        
+        // Create fake ROM header for LoROM
+        let header_start = 0x7FC0;
+        let title = b"TEST ROM             ";  // 21 bytes
+        rom_data[header_start..header_start + 0x15].copy_from_slice(title);
+        rom_data[header_start + 0x15] = 0x20; // LoROM, slow
+        rom_data[header_start + 0x17] = 0x08; // 256KB ROM size
+        
+        // Simple checksum
+        let checksum: u16 = rom_data.iter().fold(0u16, |sum, &byte| sum.wrapping_add(byte as u16));
+        let checksum_complement = checksum ^ 0xFFFF;
+        
+        rom_data[header_start + 0x1C] = (checksum_complement & 0xFF) as u8;
+        rom_data[header_start + 0x1D] = (checksum_complement >> 8) as u8;
+        rom_data[header_start + 0x1E] = (checksum & 0xFF) as u8;
+        rom_data[header_start + 0x1F] = (checksum >> 8) as u8;
+
+        let header = cartridge::RomHeader {
+            title: "TEST ROM".to_string(),
+            map_mode: cartridge::MapMode::LoROM,
+            rom_speed: cartridge::RomSpeed::Slow,
+            extra_hardware: cartridge::CartHardware::new(cartridge::ExtraHardware::RomOnly, None),
+            rom_size: 256 * 1024,
+            ram_size: 0,
+            country: cartridge::Region::NTSC,
+            developer_id: 0,
+            rom_version: 1,
+            checksum_complement,
+            checksum,
+            interrupt_vectors: cartridge::InterruptVectorTable {
+                cop: 0x8000,
+                brk: 0x8000,
+                abort: 0x8000,
+                nmi: 0x8000,
+                irq: 0x8000,
+                cop_emu: 0x8000,
+                brk_emu: 0x8000,
+                abort_emu: 0x8000,
+                nmi_emu: 0x8000,
+                reset: 0x8000,
+                irq_emu: 0x8000,
+            },
+            expanded_header: None,
+        };
+
+        let cartridge = cartridge::Cartridge {
+            header,
+            rom_data,
+        };
+
+        let ram = vec![0; 0x200000];
+        
+        Console {
             cpu: cpu::CPU::new(),
             cartridge,
             ram,
             dma: DMARegisters::default(),
             mmio: MMIORegisters::default(),
+        }
+    }
+
+    #[test]
+    fn test_debug_state_default() {
+        let state = DebugState::default();
+        assert_eq!(state.x, false);
+        assert_eq!(state.m, false);
+        assert_eq!(state.e, false);
+    }
+
+    #[test]
+    fn test_debug_state_clone() {
+        let mut state = DebugState::default();
+        state.x = true;
+        state.m = true;
+        state.e = false;
+        
+        let cloned = state.clone();
+        assert_eq!(cloned.x, true);
+        assert_eq!(cloned.m, true);
+        assert_eq!(cloned.e, false);
+    }
+
+    #[test]
+    fn test_flag_enum() {
+        let flag_start = Flag::BranchStart(0x8000);
+        let flag_cont = Flag::BranchCont(0x8001);
+        let flag_end = Flag::BranchEnd(0x8002);
+        
+        // Test that flags can be created and formatted
+        assert_eq!(format!("{:?}", flag_start), "BranchStart(32768)");
+        assert_eq!(format!("{:?}", flag_cont), "BranchCont(32769)");
+        assert_eq!(format!("{:?}", flag_end), "BranchEnd(32770)");
+    }
+
+    #[test]
+    fn test_disassembler_line() {
+        let mut console = create_test_console();
+        console.cpu.set_pc(0x808000);
+        console.cpu.P.m = false; // 16-bit accumulator
+        
+        let line = DisassemblerLine {
+            location: 0x808000,
+            flags: vec![Flag::BranchStart(0x808000)],
+            disassembled: InstructionWrapper {
+                location: 0x808000,
+                status: DebugState { x: false, m: false, e: false },
+                branchfrom: vec![],
+                branchto: None,
+                data: 0x1234,
+                instruction: cpu::InstructionContext {
+                    inst_addr: 0x808000,
+                    data_addr: 0x808001,
+                    dest_addr: None,
+                    opcode: cpu::OpCode::LDA,
+                    mode: cpu::AddrMode::Immediate,
+                },
+            },
         };
-        snes.cpu.P.e = false;
-        snes.cpu.set_pc(0x808423);
-        let disassembled = debug_simulation(&snes, 100)?;
-        let output = render_wrapped_instructions(disassembled);
-        for line in output.lines {
-            for _ in 0..output.branchdepth - line.flags.len() {
-                print!(" ");
-            }
-            for flag in line.flags {
-                match flag {
-                    Flag::BranchStart(_) => print!("╔"),
-                    Flag::BranchCont(_) => print!("║"),
-                    Flag::BranchEnd(_) => print!("╚"),
+        
+        assert_eq!(line.location, 0x808000);
+        assert_eq!(line.flags.len(), 1);
+        assert_eq!(line.disassembled.data, 0x1234);
+    }
+
+    #[test]
+    fn test_instruction_wrapper_display() {
+        let wrapper = InstructionWrapper {
+            location: 0x808000,
+            status: DebugState { x: false, m: false, e: false },
+            branchfrom: vec![],
+            branchto: None,
+            data: 0x1234,
+            instruction: cpu::InstructionContext {
+                inst_addr: 0x808000,
+                data_addr: 0x808001,
+                dest_addr: None,
+                opcode: cpu::OpCode::LDA,
+                mode: cpu::AddrMode::Immediate,
+            },
+        };
+        
+        let display_str = format!("{}", wrapper);
+        assert!(display_str.contains("$808000"));
+        assert!(display_str.contains("LDA"));
+        assert!(display_str.contains("#$1234"));
+    }
+
+    #[test]
+    fn test_instruction_wrapper_accumulator_mode() {
+        let wrapper = InstructionWrapper {
+            location: 0x808000,
+            status: DebugState { x: false, m: false, e: false },
+            branchfrom: vec![],
+            branchto: None,
+            data: 0,
+            instruction: cpu::InstructionContext {
+                inst_addr: 0x808000,
+                data_addr: 0x808000,
+                dest_addr: None,
+                opcode: cpu::OpCode::ASL,
+                mode: cpu::AddrMode::Accumulator,
+            },
+        };
+        
+        let display_str = format!("{}", wrapper);
+        assert!(display_str.contains("$808000"));
+        assert!(display_str.contains("ASL"));
+        assert!(display_str.contains("Accumulator"));
+    }
+
+    #[test]
+    fn test_instruction_wrapper_source_destination() {
+        let wrapper = InstructionWrapper {
+            location: 0x808000,
+            status: DebugState { x: false, m: false, e: false },
+            branchfrom: vec![],
+            branchto: None,
+            data: 0x1234,
+            instruction: cpu::InstructionContext {
+                inst_addr: 0x808000,
+                data_addr: 0x808001,
+                dest_addr: Some(0x808002),
+                opcode: cpu::OpCode::MVN,
+                mode: cpu::AddrMode::SourceDestination,
+            },
+        };
+        
+        let display_str = format!("{}", wrapper);
+        assert!(display_str.contains("$808000"));
+        assert!(display_str.contains("MVN"));
+        assert!(display_str.contains("$808001"));
+        assert!(display_str.contains("$808002"));
+    }
+
+    #[test]
+    fn test_disassembler_context_default() {
+        let context = DisassemblerContext::default();
+        assert_eq!(context.lines.len(), 0);
+        assert_eq!(context.branchtable.len(), 0);
+        assert_eq!(context.branchdepth, 0);
+        assert_eq!(context.startloc, 0);
+        assert_eq!(context.endloc, 0);
+    }
+
+    #[test]
+    fn test_debug_instructions_basic() -> Result<()> {
+        let mut console = create_test_console();
+        console.cpu.set_pc(0x808000);
+        console.cpu.P.m = false; // 16-bit accumulator mode
+        console.cpu.P.x = false; // 16-bit index mode
+        console.cpu.P.e = false; // Native mode
+        
+        let instructions = debug_instructions(&console, 0x808000)?;
+        
+        assert!(!instructions.is_empty());
+        assert_eq!(instructions[0].location, 0x808000);
+        assert_eq!(instructions[0].instruction.opcode, cpu::OpCode::LDA);
+        
+        Ok(())
+    }
+
+    #[test] 
+    fn test_render_wrapped_instructions_empty() {
+        let context = DisassemblerContext::default();
+        let rendered = render_wrapped_instructions(context);
+        
+        assert_eq!(rendered.lines.len(), 0);
+        assert_eq!(rendered.branchdepth, 0);
+    }
+
+    #[test]
+    fn test_render_wrapped_instructions_with_branches() {
+        let mut context = DisassemblerContext::default();
+        
+        // Create a line with branch flags
+        let line = DisassemblerLine {
+            location: 0x808000,
+            flags: vec![Flag::BranchStart(0x808000), Flag::BranchCont(0x808001)],
+            disassembled: InstructionWrapper {
+                location: 0x808000,
+                status: DebugState::default(),
+                branchfrom: vec![],
+                branchto: Some(0x808010),
+                data: 0,
+                instruction: cpu::InstructionContext {
+                    inst_addr: 0x808000,
+                    data_addr: 0x808001,
+                    dest_addr: None,
+                    opcode: cpu::OpCode::BRA,
+                    mode: cpu::AddrMode::RelativeByte,
+                },
+            },
+        };
+        
+        context.lines.push(line);
+        context.branchtable.push(0);
+        
+        let rendered = render_wrapped_instructions(context);
+        assert_eq!(rendered.lines.len(), 1);
+        assert_eq!(rendered.branchdepth, 2); // Should be set to the max flag count
+    }
+
+    #[test]
+    fn test_disassembly_error_display() {
+        let error = DisassemblyError {
+            instructions: vec![],
+            status: create_test_console(),
+            source: color_eyre::eyre::eyre!("Test error"),
+        };
+        
+        let display_str = format!("{}", error);
+        assert!(!display_str.is_empty());
+    }
+
+    #[test]
+    fn test_disassembler_error_display() {
+        let error = DisassemblerError::Other(color_eyre::eyre::eyre!("Test error"));
+        let display_str = format!("{}", error);
+        assert!(display_str.contains("Test error"));
+    }
+
+    #[test]
+    fn test_debug_simulation_basic() -> Result<()> {
+        let mut console = create_test_console();
+        console.cpu.set_pc(0x808000);
+        console.cpu.P.m = false; // 16-bit mode
+        console.cpu.P.x = false; // 16-bit mode
+        console.cpu.P.e = false; // Native mode
+        
+        let context = debug_simulation(&console, 10)?;
+        
+        assert!(!context.lines.is_empty());
+        assert_eq!(context.startloc, 0x808000);
+        assert!(context.endloc >= 0x808000);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_branch_detection() -> Result<()> {
+        let mut console = create_test_console();
+        console.cpu.set_pc(0x808004); // Start at BRA instruction
+        console.cpu.P.m = false;
+        console.cpu.P.x = false;
+        console.cpu.P.e = false;
+        
+        let context = debug_simulation(&console, 5)?;
+        
+        // Should detect the branch instruction
+        let has_branch = context.lines.iter().any(|line| {
+            line.disassembled.instruction.opcode == cpu::OpCode::BRA
+        });
+        
+        assert!(has_branch);
+        Ok(())
+    }
+
+    // Conditional test that only runs if the super_metroid.sfc file exists
+    #[test]
+    #[ignore] // Ignore by default since it requires a specific ROM file
+    fn test_debugger_with_real_rom() -> Result<()> {
+        if std::path::Path::new("./super_metroid.sfc").exists() {
+            let cartridge = cartridge::load_rom(std::path::Path::new("./super_metroid.sfc"), false)?;
+            let ram = vec![0; 0x200000];
+            let mut snes = Console {
+                cpu: cpu::CPU::new(),
+                cartridge,
+                ram,
+                dma: DMARegisters::default(),
+                mmio: MMIORegisters::default(),
+            };
+            snes.cpu.P.e = false;
+            snes.cpu.set_pc(0x808423);
+            
+            let disassembled = debug_simulation(&snes, 100)?;
+            let output = render_wrapped_instructions(disassembled);
+            
+            assert!(!output.lines.is_empty());
+            
+            for line in output.lines.iter().take(5) { // Just check first 5 lines
+                for _ in 0..output.branchdepth.saturating_sub(line.flags.len()) {
+                    print!(" ");
                 }
+                for flag in &line.flags {
+                    match flag {
+                        Flag::BranchStart(_) => print!("╔"),
+                        Flag::BranchCont(_) => print!("║"),
+                        Flag::BranchEnd(_) => print!("╚"),
+                    }
+                }
+                println!("{}", line.disassembled);
             }
-            println!("{:}", line.disassembled);
+        } else {
+            println!("Skipping test - super_metroid.sfc not found");
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_instruction_wrapper_with_8bit_immediate() {
+        let wrapper = InstructionWrapper {
+            location: 0x808000,
+            status: DebugState { x: false, m: true, e: false }, // 8-bit accumulator
+            branchfrom: vec![],
+            branchto: None,
+            data: 0x34,
+            instruction: cpu::InstructionContext {
+                inst_addr: 0x808000,
+                data_addr: 0x808001,
+                dest_addr: None,
+                opcode: cpu::OpCode::LDA,
+                mode: cpu::AddrMode::Immediate,
+            },
+        };
+        
+        let display_str = format!("{}", wrapper);
+        assert!(display_str.contains("$808000"));
+        assert!(display_str.contains("LDA"));
+        // Should display as 8-bit immediate in 8-bit mode
+        assert!(display_str.contains("#$34") || display_str.contains("#$0034"));
+    }
+
+    #[test] 
+    fn test_instruction_wrapper_rep_instruction() {
+        let wrapper = InstructionWrapper {
+            location: 0x808000,
+            status: DebugState { x: false, m: false, e: false },
+            branchfrom: vec![],
+            branchto: None,
+            data: 0x30, // REP #$30 (enable 16-bit A and X/Y)
+            instruction: cpu::InstructionContext {
+                inst_addr: 0x808000,
+                data_addr: 0x808001,
+                dest_addr: None,
+                opcode: cpu::OpCode::REP,
+                mode: cpu::AddrMode::Immediate,
+            },
+        };
+        
+        let display_str = format!("{}", wrapper);
+        assert!(display_str.contains("REP"));
+        assert!(display_str.contains("#$30"));
+    }
+
+    #[test]
+    fn test_instruction_wrapper_pea_instruction() {
+        let wrapper = InstructionWrapper {
+            location: 0x808000,
+            status: DebugState { x: false, m: false, e: false },
+            branchfrom: vec![],
+            branchto: None,
+            data: 0x1234,
+            instruction: cpu::InstructionContext {
+                inst_addr: 0x808000,
+                data_addr: 0x808001,
+                dest_addr: None,
+                opcode: cpu::OpCode::PEA,
+                mode: cpu::AddrMode::Immediate,
+            },
+        };
+        
+        let display_str = format!("{}", wrapper);
+        assert!(display_str.contains("PEA"));
+        assert!(display_str.contains("#$1234")); // PEA always uses 16-bit immediate
     }
 }
