@@ -84,7 +84,7 @@ impl std::fmt::Display for InstructionWrapper {
                 OpCode::PEA | OpCode::PER => {
                     write!(
                         f,
-                        "${:06X}: {} #{:04X} ({})",
+                        "${:06X}: {} #${:04X} ({})",
                         self.instruction.inst_addr,
                         self.instruction.opcode,
                         self.data,
@@ -95,7 +95,7 @@ impl std::fmt::Display for InstructionWrapper {
                     if self.status.m {
                         write!(
                             f,
-                            "${:06X}: {} #{:02X} ({})",
+                            "${:06X}: {} #${:02X} ({})",
                             self.instruction.inst_addr,
                             self.instruction.opcode,
                             self.data & 0xFF,
@@ -104,8 +104,11 @@ impl std::fmt::Display for InstructionWrapper {
                     } else {
                         write!(
                             f,
-                            "${:06X}: {} #{:04X}",
-                            self.instruction.inst_addr, self.instruction.opcode, self.data,
+                            "${:06X}: {} #${:04X} ({})",
+                            self.instruction.inst_addr,
+                            self.instruction.opcode,
+                            self.data,
+                            self.instruction.mode
                         )
                     }
                 }
