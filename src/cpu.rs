@@ -171,57 +171,91 @@ pub enum OpCode {
 
 impl OpCode {
     pub fn is_branch(&self) -> bool {
-        match self {
+        matches!(
+            self,
             OpCode::BRA
-            | OpCode::BCC
-            | OpCode::BCS
-            | OpCode::BEQ
-            | OpCode::BMI
-            | OpCode::BNE
-            | OpCode::BPL
-            | OpCode::BVC
-            | OpCode::BVS => true,
-            _ => false,
-        }
+                | OpCode::BCC
+                | OpCode::BCS
+                | OpCode::BEQ
+                | OpCode::BMI
+                | OpCode::BNE
+                | OpCode::BPL
+                | OpCode::BVC
+                | OpCode::BVS
+        )
     }
     pub fn is_jump(&self) -> bool {
-        match self {
-            OpCode::JMP | OpCode::JSR | OpCode::JML | OpCode::JSL => true,
-            _ => false,
-        }
+        matches!(self, OpCode::JMP | OpCode::JSR | OpCode::JML | OpCode::JSL)
     }
     pub fn is_interrupt(&self) -> bool {
-        match self {
-            OpCode::BRK | OpCode::COP => true,
-            _ => false,
-        }
+        matches!(self, OpCode::BRK | OpCode::COP)
     }
     pub fn is_subroutine(&self) -> bool {
-        match self {
-            OpCode::JML | OpCode::JSR => true,
-            _ => false,
-        }
+        matches!(self, OpCode::JML | OpCode::JSR)
     }
     pub fn is_return(&self) -> bool {
-        match self {
-            OpCode::RTS | OpCode::RTI | OpCode::RTL => true,
-            _ => false,
-        }
+        matches!(self, OpCode::RTS | OpCode::RTI | OpCode::RTL)
     }
     pub fn is_old(&self) -> bool {
         OLD_OPCODES.contains(self)
     }
     pub fn changes_x(&self) -> bool {
-        match self {
-            OpCode::PLP | OpCode::RTI | OpCode::REP | OpCode::SEP => true,
-            _ => false,
-        }
+        matches!(self, OpCode::PLP | OpCode::RTI | OpCode::REP | OpCode::SEP)
     }
     pub fn changes_m(&self) -> bool {
-        match self {
-            OpCode::PLP | OpCode::RTI | OpCode::REP | OpCode::SEP => true,
-            _ => false,
-        }
+        matches!(self, OpCode::PLP | OpCode::RTI | OpCode::REP | OpCode::SEP)
+    }
+    fn uses_x(&self) -> bool {
+        matches!(
+            self,
+            OpCode::CPX
+                | OpCode::CPY
+                | OpCode::DEX
+                | OpCode::DEY
+                | OpCode::INX
+                | OpCode::INY
+                | OpCode::LDX
+                | OpCode::LDY
+                | OpCode::STX
+                | OpCode::STY
+                | OpCode::PHX
+                | OpCode::PHY
+                | OpCode::PLX
+                | OpCode::PLY
+                | OpCode::TAX
+                | OpCode::TAY
+                | OpCode::TSX
+                | OpCode::TXS
+                | OpCode::TXY
+                | OpCode::TYX
+        )
+    }
+    fn uses_m(&self) -> bool {
+        matches!(
+            self,
+            OpCode::ADC
+                | OpCode::SBC
+                | OpCode::AND
+                | OpCode::EOR
+                | OpCode::ORA
+                | OpCode::ASL
+                | OpCode::LSR
+                | OpCode::ROL
+                | OpCode::ROR
+                | OpCode::BIT
+                | OpCode::CMP
+                | OpCode::DEC
+                | OpCode::INC
+                | OpCode::LDA
+                | OpCode::STA
+                | OpCode::STZ
+                | OpCode::PHA
+                | OpCode::PLA
+                | OpCode::TRB
+                | OpCode::TSB
+                | OpCode::TXA
+                | OpCode::TYA
+        )
     }
 }
 
@@ -594,7 +628,15 @@ impl InstructionContext {
             AddrMode::IndexedDirectWord => 2,
             AddrMode::DirectIndexedWord => 2,
             AddrMode::DirectIndexedSWord => 2,
-            AddrMode::Immediate => 3 - ((m as usize) | (x as usize)),
+            AddrMode::Immediate => {
+                if self.opcode.uses_m() {
+                    3 - (m as usize)
+                } else if self.opcode.uses_x() {
+                    3 - (x as usize)
+                } else {
+                    3
+                }
+            }
             AddrMode::Implied => 1,
             AddrMode::Long => 4,
             AddrMode::LongX => 4,
@@ -690,28 +732,29 @@ pub enum CPUExecutionResult {
 }
 
 pub fn decode_addressing_mode(opcode: u8) -> Result<AddrMode> {
-    let aaa = (opcode & 0b11100000) >> 5;
     let bbb = (opcode & 0b00011100) >> 2;
     let cc = opcode & 0b00000011;
 
     match opcode {
-        0x00 | 0x08 | 0x0B | 0x18 | 0x1A | 0x1B | 0x28 | 0x2B | 0x38 | 0x3A | 0x3B | 0x40
-        | 0x48 | 0x4B | 0x58 | 0x5A | 0x5B | 0x60 | 0x68 | 0x6B | 0x78 | 0x7A | 0x7B | 0x88
-        | 0x8A | 0x8B | 0x98 | 0x9A | 0x9B | 0xA8 | 0xAA | 0xAB | 0xB8 | 0xBA | 0xBB | 0xC8
-        | 0xCA | 0xCB | 0xD8 | 0xDA | 0xDB | 0xE8 | 0xEA | 0xEB | 0xF8 | 0xFA | 0xFB => {
+        0x00 | 0x08 | 0x0B | 0x18 | 0x1B | 0x28 | 0x2B | 0x38 | 0x3B | 0x40 | 0x48 | 0x4B
+        | 0x58 | 0x5A | 0x5B | 0x60 | 0x68 | 0x6B | 0x78 | 0x7A | 0x7B | 0x88 | 0x8A | 0x8B
+        | 0x98 | 0x9A | 0x9B | 0xA8 | 0xAA | 0xAB | 0xB8 | 0xBA | 0xBB | 0xC8 | 0xCA | 0xCB
+        | 0xD8 | 0xDA | 0xDB | 0xE8 | 0xEA | 0xEB | 0xF8 | 0xFA | 0xFB => {
             return Ok(AddrMode::Implied)
         } // Single byte instructions
+        0x0A | 0x1A | 0x2A | 0x3A | 0x4A | 0x6A => return Ok(AddrMode::Accumulator), // ASL A, INC A, ROL A, DEC A, LSR A, ROR A
         0x14 | 0x64 | 0xD4 => return Ok(AddrMode::Direct), // TRB zp, STZ zp, PEI dir
         0x1C | 0x20 | 0x9C => return Ok(AddrMode::Absolute), // TRB abs, JSR abs, STZ abs
         0x22 | 0x5C => return Ok(AddrMode::Long),          // JMP long,
         0x44 | 0x52 => return Ok(AddrMode::SourceDestination), // MVN src,dest, MVP src,dest
         0xDC => return Ok(AddrMode::AbsoluteSWord),
-        0x74 => return Ok(AddrMode::DirectX), // STZ zp,X
+        0x6C => return Ok(AddrMode::AbsoluteIndirectWord), // JMP (abs)
+        0x74 => return Ok(AddrMode::DirectX),              // STZ zp,X
         0x7C | 0xFC => return Ok(AddrMode::AbsoluteIndexedIndirect), // JMP (abs,X), JSR (abs,X)
         0x10 | 0x30 | 0x50 | 0x70 | 0x80 | 0x90 | 0xB0 | 0xD0 | 0xF0 => {
             return Ok(AddrMode::RelativeByte)
         } // BRA rel8
-        0x82 => return Ok(AddrMode::RelativeWord), // BRL rel16
+        0x82 => return Ok(AddrMode::RelativeWord),         // BRL rel16
         0x02 | 0x42 | 0x62 | 0x89 | 0xC2 | 0xE2 | 0xF4 => return Ok(AddrMode::Immediate), // COP immed, PER immed, BIT immed, REP immed, SEP immed, PEA immed
         0x9E => return Ok(AddrMode::AbsoluteX), // STZ abs,X
         _ => (),
@@ -1002,8 +1045,16 @@ fn calculate_address(
             let refaddr = ((snes.cpu.DBR as u32) << 16) | h << 8 | l;
             refaddr + snes.cpu.Y as u32
         }
-        AddrMode::AbsoluteIndirectWord => todo!(),
-        AddrMode::AbsoluteIndirectSWord => todo!(),
+        AddrMode::AbsoluteIndirectWord => {
+            let refaddr = h << 8 | l;
+            (snes.cpu.K as u32) << 16 | memory::read_word(snes, refaddr)? as u32
+        }
+        AddrMode::AbsoluteIndirectSWord => {
+            let refaddr = h << 8 | l;
+            let low = memory::read_word(snes, refaddr)? as u32;
+            let high = memory::read_byte(snes, refaddr + 2)? as u32;
+            high << 16 | low
+        }
         AddrMode::AbsoluteIndexedIndirect => {
             let refaddr = ((snes.cpu.K as u32) << 16) | h << 8 | l;
             refaddr + snes.cpu.X as u32
@@ -1361,7 +1412,6 @@ fn execute_instruction_emu(
             snes.cpu.PC = snes.cartridge.header.interrupt_vectors.brk_emu;
             snes.cpu.P.i = true;
             snes.cpu.P.d = false;
-            snes.cpu.PC += instruction.length(snes.cpu.P.m, snes.cpu.P.x) as u16;
             return Ok(CPUExecutionResult::Interrupt);
         }
         OpCode::JMP => {
@@ -1445,6 +1495,21 @@ pub fn execute_instruction(
                 snes.cpu.P.n = snes.cpu.A >= 0b10000000;
                 snes.cpu.P.v = overflow || overflow2;
                 snes.cpu.P.c = overflow || overflow2;
+            }
+        }
+        OpCode::AND => {
+            if snes.cpu.P.m {
+                let temp =
+                    (snes.cpu.A & 0xFF) as u8 & memory::read_byte(snes, instruction.data_addr)?;
+                snes.cpu.P.z = temp == 0;
+                snes.cpu.P.n = temp & 0x80 != 0;
+                snes.cpu.A &= 0xFF00;
+                snes.cpu.A |= temp as u16;
+            } else {
+                let temp = snes.cpu.A & memory::read_word(snes, instruction.data_addr)?;
+                snes.cpu.P.z = temp == 0;
+                snes.cpu.P.n = temp & 0x8000 != 0;
+                snes.cpu.A = temp;
             }
         }
         OpCode::ASL => {
@@ -1547,6 +1612,9 @@ pub fn execute_instruction(
         OpCode::CLI => {
             snes.cpu.P.i = false;
         }
+        OpCode::SEC => {
+            snes.cpu.P.c = true;
+        }
         OpCode::CMP => {
             if snes.cpu.P.m {
                 let data = memory::read_byte(snes, instruction.data_addr)?;
@@ -1593,17 +1661,33 @@ pub fn execute_instruction(
             }
         }
         OpCode::DEC => {
-            if snes.cpu.P.m {
-                let mut temp = (snes.cpu.A & 0xFF) as u8;
-                temp = temp.wrapping_sub(1);
-                snes.cpu.A &= 0xFF00;
-                snes.cpu.A |= temp as u16;
-                snes.cpu.P.n = (temp & 0x80) != 0;
-                snes.cpu.P.z = temp == 0;
+            if instruction.mode == AddrMode::Accumulator {
+                if snes.cpu.P.m {
+                    let mut temp = (snes.cpu.A & 0xFF) as u8;
+                    temp = temp.wrapping_sub(1);
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= temp as u16;
+                    snes.cpu.P.n = (temp & 0x80) != 0;
+                    snes.cpu.P.z = temp == 0;
+                } else {
+                    snes.cpu.A = snes.cpu.A.wrapping_sub(1);
+                    snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
+                    snes.cpu.P.z = snes.cpu.A == 0;
+                }
             } else {
-                snes.cpu.A = snes.cpu.A.wrapping_sub(1);
-                snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
-                snes.cpu.P.z = snes.cpu.A == 0;
+                if snes.cpu.P.m {
+                    let mut data = memory::read_byte(snes, instruction.data_addr)?;
+                    data = data.wrapping_sub(1);
+                    memory::write_byte(snes, instruction.data_addr, data)?;
+                    snes.cpu.P.n = (data & 0x80) != 0;
+                    snes.cpu.P.z = data == 0;
+                } else {
+                    let mut data = memory::read_word(snes, instruction.data_addr)?;
+                    data = data.wrapping_sub(1);
+                    memory::write_word(snes, instruction.data_addr, data)?;
+                    snes.cpu.P.n = (data & 0x8000) != 0;
+                    snes.cpu.P.z = data == 0;
+                }
             }
         }
         OpCode::DEX => {
@@ -1635,17 +1719,33 @@ pub fn execute_instruction(
             }
         }
         OpCode::INC => {
-            if snes.cpu.P.m {
-                let mut temp = (snes.cpu.A & 0xFF) as u8;
-                temp = temp.wrapping_add(1);
-                snes.cpu.A &= 0xFF00;
-                snes.cpu.A |= temp as u16;
-                snes.cpu.P.n = (temp & 0x80) != 0;
-                snes.cpu.P.z = temp == 0;
+            if instruction.mode == AddrMode::Accumulator {
+                if snes.cpu.P.m {
+                    let mut temp = (snes.cpu.A & 0xFF) as u8;
+                    temp = temp.wrapping_add(1);
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= temp as u16;
+                    snes.cpu.P.n = (temp & 0x80) != 0;
+                    snes.cpu.P.z = temp == 0;
+                } else {
+                    snes.cpu.A = snes.cpu.A.wrapping_add(1);
+                    snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
+                    snes.cpu.P.z = snes.cpu.A == 0;
+                }
             } else {
-                snes.cpu.A = snes.cpu.A.wrapping_add(1);
-                snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
-                snes.cpu.P.z = snes.cpu.A == 0;
+                if snes.cpu.P.m {
+                    let mut data = memory::read_byte(snes, instruction.data_addr)?;
+                    data = data.wrapping_add(1);
+                    memory::write_byte(snes, instruction.data_addr, data)?;
+                    snes.cpu.P.n = (data & 0x80) != 0;
+                    snes.cpu.P.z = data == 0;
+                } else {
+                    let mut data = memory::read_word(snes, instruction.data_addr)?;
+                    data = data.wrapping_add(1);
+                    memory::write_word(snes, instruction.data_addr, data)?;
+                    snes.cpu.P.n = (data & 0x8000) != 0;
+                    snes.cpu.P.z = data == 0;
+                }
             }
         }
         OpCode::INX => {
@@ -1689,8 +1789,7 @@ pub fn execute_instruction(
                 } else {
                     let mut temp = read_byte(snes, instruction.data_addr)?;
                     snes.cpu.P.c = (temp & 0x01) != 0;
-                    let mut temp = (temp & 0xFE) as u8;
-                    temp >>= 1;
+                    let temp = (temp & 0xFE) >> 1;
                     write_byte(snes, instruction.data_addr, temp)?;
                     snes.cpu.P.z = temp == 0;
                     snes.cpu.P.n = false;
@@ -1769,7 +1868,7 @@ pub fn execute_instruction(
                     snes.cpu.P.z = temp_a == 0;
                     snes.cpu.P.n = (temp_a & 0x80) != 0;
                 } else {
-                    let mut temp = memory::read_byte(snes, instruction.data_addr)?;
+                    let temp = memory::read_byte(snes, instruction.data_addr)?;
                     snes.cpu.P.c = (temp & 0x01) != 0;
                     let temp = (temp & 0xFE) >> 1;
                     memory::write_byte(snes, instruction.data_addr, temp)?;
@@ -1785,7 +1884,7 @@ pub fn execute_instruction(
                     snes.cpu.P.z = temp_a == 0;
                     snes.cpu.P.n = (temp_a & 0x8000) != 0;
                 } else {
-                    let mut temp = memory::read_word(snes, instruction.data_addr)?;
+                    let temp = memory::read_word(snes, instruction.data_addr)?;
                     snes.cpu.P.c = (temp & 0x0001) != 0;
                     let temp = (temp & 0xFFFE) >> 1;
                     memory::write_word(snes, instruction.data_addr, temp)?;
@@ -1881,46 +1980,46 @@ pub fn execute_instruction(
         }
         OpCode::LDA => {
             if snes.cpu.P.m {
-                snes.cpu.A &= 0xF0;
+                snes.cpu.A &= 0xFF00;
                 let temp = memory::read_byte(snes, instruction.data_addr)?;
                 snes.cpu.A |= temp as u16;
                 snes.cpu.P.n = (temp & 0x80) != 0;
                 snes.cpu.P.z = temp == 0;
             } else {
                 snes.cpu.A = memory::read_word(snes, instruction.data_addr)?;
-                snes.cpu.P.n = (snes.cpu.A & 0x80) != 0;
+                snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
                 snes.cpu.P.z = snes.cpu.A == 0;
             }
         }
         OpCode::LDX => {
             if snes.cpu.P.x {
-                snes.cpu.X &= 0xF0;
+                snes.cpu.X &= 0xFF00;
                 let temp = memory::read_byte(snes, instruction.data_addr)?;
                 snes.cpu.X |= temp as u16;
                 snes.cpu.P.n = (temp & 0x80) != 0;
                 snes.cpu.P.z = temp == 0;
             } else {
                 snes.cpu.X = memory::read_word(snes, instruction.data_addr)?;
-                snes.cpu.P.n = (snes.cpu.X & 0x80) != 0;
+                snes.cpu.P.n = (snes.cpu.X & 0x8000) != 0;
                 snes.cpu.P.z = snes.cpu.X == 0;
             }
         }
         OpCode::LDY => {
             if snes.cpu.P.x {
-                snes.cpu.Y &= 0xF0;
+                snes.cpu.Y &= 0xFF00;
                 let temp = memory::read_byte(snes, instruction.data_addr)?;
                 snes.cpu.Y |= temp as u16;
                 snes.cpu.P.n = (temp & 0x80) != 0;
                 snes.cpu.P.z = temp == 0;
             } else {
                 snes.cpu.Y = memory::read_word(snes, instruction.data_addr)?;
-                snes.cpu.P.n = (snes.cpu.Y & 0x80) != 0;
+                snes.cpu.P.n = (snes.cpu.Y & 0x8000) != 0;
                 snes.cpu.P.z = snes.cpu.Y == 0;
             }
         }
         OpCode::PHA => {
             if snes.cpu.P.m {
-                push_byte(snes, snes.cpu.A.to_be_bytes()[1])?;
+                push_byte(snes, snes.cpu.A.to_le_bytes()[0])?;
             } else {
                 push_word(snes, snes.cpu.A)?;
             }
@@ -1939,14 +2038,14 @@ pub fn execute_instruction(
         }
         OpCode::PHX => {
             if snes.cpu.P.x {
-                push_byte(snes, snes.cpu.X.to_be_bytes()[1])?;
+                push_byte(snes, snes.cpu.X.to_le_bytes()[0])?;
             } else {
                 push_word(snes, snes.cpu.X)?;
             }
         }
         OpCode::PHY => {
             if snes.cpu.P.x {
-                push_byte(snes, snes.cpu.Y.to_be_bytes()[1])?;
+                push_byte(snes, snes.cpu.Y.to_le_bytes()[0])?;
             } else {
                 push_word(snes, snes.cpu.Y)?;
             }
@@ -2020,17 +2119,159 @@ pub fn execute_instruction(
             snes.cpu.PC = u16::from_be_bytes([pc_h, pc_l]);
             snes.cpu.K = pull_byte(snes)?;
         }
+        OpCode::TAX => {
+            if snes.cpu.P.x {
+                let temp = (snes.cpu.A & 0xFF) as u8;
+                snes.cpu.X &= 0xFF00;
+                snes.cpu.X |= temp as u16;
+                snes.cpu.P.n = (temp & 0x80) != 0;
+                snes.cpu.P.z = temp == 0;
+            } else {
+                snes.cpu.X = snes.cpu.A;
+                snes.cpu.P.n = (snes.cpu.X & 0x8000) != 0;
+                snes.cpu.P.z = snes.cpu.X == 0;
+            }
+        }
+        OpCode::TAY => {
+            if snes.cpu.P.x {
+                let temp = (snes.cpu.A & 0xFF) as u8;
+                snes.cpu.Y &= 0xFF00;
+                snes.cpu.Y |= temp as u16;
+                snes.cpu.P.n = (temp & 0x80) != 0;
+                snes.cpu.P.z = temp == 0;
+            } else {
+                snes.cpu.Y = snes.cpu.A;
+                snes.cpu.P.n = (snes.cpu.Y & 0x8000) != 0;
+                snes.cpu.P.z = snes.cpu.Y == 0;
+            }
+        }
+        OpCode::TSX => {
+            if snes.cpu.P.x {
+                let temp = (snes.cpu.S & 0xFF) as u8;
+                snes.cpu.X &= 0xFF00;
+                snes.cpu.X |= temp as u16;
+                snes.cpu.P.n = (temp & 0x80) != 0;
+                snes.cpu.P.z = temp == 0;
+            } else {
+                snes.cpu.X = snes.cpu.S;
+                snes.cpu.P.n = (snes.cpu.X & 0x8000) != 0;
+                snes.cpu.P.z = snes.cpu.X == 0;
+            }
+        }
+        OpCode::TXS => {
+            snes.cpu.S = snes.cpu.X;
+            snes.cpu.P.n = (snes.cpu.S & 0x8000) != 0;
+            snes.cpu.P.z = snes.cpu.S == 0;
+        }
+        OpCode::TXA => {
+            if snes.cpu.P.m {
+                let temp = (snes.cpu.X & 0xFF) as u8;
+                snes.cpu.A &= 0xFF00;
+                snes.cpu.A |= temp as u16;
+                snes.cpu.P.n = (temp & 0x80) != 0;
+                snes.cpu.P.z = temp == 0;
+            } else {
+                snes.cpu.A = snes.cpu.X;
+                snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
+                snes.cpu.P.z = snes.cpu.A == 0;
+            }
+        }
+        OpCode::TYA => {
+            if snes.cpu.P.m {
+                let temp = (snes.cpu.Y & 0xFF) as u8;
+                snes.cpu.A &= 0xFF00;
+                snes.cpu.A |= temp as u16;
+                snes.cpu.P.n = (temp & 0x80) != 0;
+                snes.cpu.P.z = temp == 0;
+            } else {
+                snes.cpu.A = snes.cpu.Y;
+                snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
+                snes.cpu.P.z = snes.cpu.A == 0;
+            }
+        }
         OpCode::TCD => {
             snes.cpu.D = snes.cpu.A;
             snes.cpu.P.n = (snes.cpu.D & 0x8000) != 0;
             snes.cpu.P.z = snes.cpu.D == 0;
         }
-        OpCode::TXS => {
-            if snes.cpu.P.x {
-                snes.cpu.S = snes.cpu.X;
-                snes.cpu.S &= 0x0F;
+        OpCode::TDC => {
+            snes.cpu.A = snes.cpu.D;
+            snes.cpu.P.n = (snes.cpu.A & 0x8000) != 0;
+            snes.cpu.P.z = snes.cpu.A == 0;
+        }
+        OpCode::TRB => {
+            if snes.cpu.P.m {
+                let val = memory::read_byte(snes, instruction.data_addr)?;
+                let result = val & ((snes.cpu.A & 0xFF) ^ 0xFF) as u8;
+                memory::write_byte(snes, instruction.data_addr, result)?;
+                snes.cpu.P.z = result == 0;
             } else {
-                snes.cpu.S = snes.cpu.X;
+                let val = memory::read_word(snes, instruction.data_addr)?;
+                let result = val & (snes.cpu.A ^ 0xFFFF);
+                memory::write_word(snes, instruction.data_addr, result)?;
+                snes.cpu.P.z = result == 0;
+            }
+        }
+        OpCode::TSB => {
+            if snes.cpu.P.m {
+                let val = memory::read_byte(snes, instruction.data_addr)?;
+                let result = val | (snes.cpu.A & 0xFF) as u8;
+                memory::write_byte(snes, instruction.data_addr, result)?;
+                snes.cpu.P.z = result == 0;
+            } else {
+                let val = memory::read_word(snes, instruction.data_addr)?;
+                let result = val | snes.cpu.A;
+                memory::write_word(snes, instruction.data_addr, result)?;
+                snes.cpu.P.z = result == 0;
+            }
+        }
+        OpCode::SBC => {
+            if snes.cpu.P.d {
+                unimplemented!("Decimal mode");
+            } else {
+                if snes.cpu.P.m {
+                    let data = memory::read_byte(snes, instruction.data_addr)?;
+                    let a_val = (snes.cpu.A & 0xFF) as u8;
+                    let carry = if snes.cpu.P.c { 1 } else { 0 };
+                    let result = a_val.wrapping_sub(data).wrapping_sub(1 - carry);
+
+                    snes.cpu.P.z = result == 0;
+                    snes.cpu.P.n = (result & 0x80) != 0;
+                    snes.cpu.P.c = (a_val as u16 + carry as u16) >= (data as u16 + 1);
+                    snes.cpu.P.v = ((a_val ^ data) & 0x80 != 0) && ((a_val ^ result) & 0x80 != 0);
+
+                    snes.cpu.A &= 0xFF00;
+                    snes.cpu.A |= result as u16;
+                } else {
+                    let data = memory::read_word(snes, instruction.data_addr)?;
+                    let carry = if snes.cpu.P.c { 1 } else { 0 };
+                    let result = snes.cpu.A.wrapping_sub(data).wrapping_sub(1 - carry);
+
+                    snes.cpu.P.z = result == 0;
+                    snes.cpu.P.n = (result & 0x8000) != 0;
+                    snes.cpu.P.c = (snes.cpu.A as u32 + carry as u32) >= (data as u32 + 1);
+                    snes.cpu.P.v = ((snes.cpu.A ^ data) & 0x8000 != 0)
+                        && ((snes.cpu.A ^ result) & 0x8000 != 0);
+
+                    snes.cpu.A = result;
+                }
+            }
+        }
+        OpCode::XBA => {
+            let l = snes.cpu.A & 0xFF;
+            let h = (snes.cpu.A & 0xFF00) >> 8;
+            snes.cpu.A = (l << 8) | h;
+        }
+        OpCode::XCE => {
+            let temp = snes.cpu.P.c;
+            snes.cpu.P.c = snes.cpu.P.e;
+            snes.cpu.P.e = temp;
+
+            // When switching to emulation mode, force M=1, X=1, and SH=01
+            if snes.cpu.P.e {
+                snes.cpu.P.m = true;
+                snes.cpu.P.x = true;
+                snes.cpu.S = (snes.cpu.S & 0x00FF) | 0x0100;
             }
         }
         _ => todo!("{} Not implemented yet", instruction.opcode),
@@ -2042,6 +2283,12 @@ pub fn execute_instruction(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cartridge::{
+        CartHardware, Cartridge, ExtraHardware, InterruptVectorTable, MapMode, Region, RomHeader,
+        RomSpeed,
+    };
+    use crate::registers::{DMARegisters, MMIORegisters};
+    use crate::Console;
 
     #[test]
     fn test_addrmode_decode() {
@@ -2053,6 +2300,373 @@ mod tests {
                     assert!(false, "{:02X}: {:?}", x, addrmode);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_accumulator_mode_opcodes() {
+        // Test that shift/rotate and increment/decrement instructions on accumulator
+        // use the correct Accumulator addressing mode
+        let test_cases = [
+            (0x0A, "ASL A"),
+            (0x2A, "ROL A"),
+            (0x4A, "LSR A"),
+            (0x6A, "ROR A"),
+            (0x1A, "INC A"),
+            (0x3A, "DEC A"),
+        ];
+
+        for (opcode, name) in test_cases {
+            let result = decode_addressing_mode(opcode).unwrap();
+            assert_eq!(
+                result,
+                AddrMode::Accumulator,
+                "{} (0x{:02X}) should be Accumulator mode, got {:?}",
+                name,
+                opcode,
+                result
+            );
+        }
+    }
+
+    fn setup_test_console() -> Console {
+        // A minimal console for testing
+        let cartridge = Cartridge {
+            header: RomHeader {
+                title: "Test ROM".to_string(),
+                map_mode: MapMode::LoROM,
+                rom_speed: RomSpeed::Slow,
+                extra_hardware: CartHardware::new(ExtraHardware::RomOnly, None),
+                rom_size: 32 * 1024,
+                ram_size: 8 * 1024,
+                country: Region::NTSC,
+                developer_id: 0,
+                rom_version: 0,
+                checksum_complement: 0,
+                checksum: 0,
+                interrupt_vectors: InterruptVectorTable {
+                    cop: 0,
+                    brk: 0xFFE6,
+                    abort: 0,
+                    nmi: 0,
+                    irq: 0xFFEE,
+                    cop_emu: 0,
+                    brk_emu: 0xFFFE,
+                    abort_emu: 0,
+                    nmi_emu: 0,
+                    reset: 0x8000,
+                    irq_emu: 0xFFFE,
+                },
+                expanded_header: None,
+            },
+            rom_data: vec![0; 32 * 1024],
+        };
+
+        let mut snes = Console {
+            cpu: CPU::new(),
+            cartridge,
+            ram: vec![0; 0x200000],
+            mmio: MMIORegisters::default(),
+            dma: DMARegisters::default(),
+        };
+        snes.cpu.P.e = false; // native mode
+        snes.cpu.P.m = true; // 8-bit accumulator by default for tests
+        snes.cpu.P.x = true; // 8-bit index by default for tests
+        snes.cpu.P.i = true; // interrupts disabled by default for tests
+        snes.cpu.set_pc(0x7E0000); // Point to RAM instead of ROM
+        snes
+    }
+
+    // Helper to run a single instruction from a byte slice
+    fn run_test_instruction(snes: &mut Console, opcode: &[u8]) -> Result<CPUExecutionResult> {
+        // Write opcode to memory at current PC
+        for (i, byte) in opcode.iter().enumerate() {
+            memory::write_byte(snes, snes.cpu.get_pc() + i as u32, *byte).unwrap();
+        }
+
+        let op = memory::read_byte(snes, snes.cpu.get_pc())?;
+        let instruction = decode_instruction(snes, op, snes.cpu.get_pc())?;
+        execute_instruction(snes, &instruction)
+    }
+
+    mod load_store_tests {
+        use super::*;
+
+        #[test]
+        fn lda_immediate_8bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = true; // 8-bit accumulator
+            run_test_instruction(&mut snes, &[0xA9, 0x42]).unwrap();
+            assert_eq!(snes.cpu.A & 0xFF, 0x42);
+            assert_eq!(snes.cpu.P.z, false);
+            assert_eq!(snes.cpu.P.n, false);
+        }
+
+        #[test]
+        fn lda_immediate_16bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = false; // 16-bit accumulator
+            run_test_instruction(&mut snes, &[0xA9, 0x34, 0x12]).unwrap();
+            assert_eq!(snes.cpu.A, 0x1234);
+            assert_eq!(snes.cpu.P.z, false);
+            assert_eq!(snes.cpu.P.n, false);
+        }
+
+        #[test]
+        fn ldx_immediate_8bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.x = true; // 8-bit index
+            run_test_instruction(&mut snes, &[0xA2, 0x42]).unwrap();
+            assert_eq!(snes.cpu.X & 0xFF, 0x42);
+        }
+
+        #[test]
+        fn ldy_absolute_16bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.x = false; // 16-bit index
+            snes.cpu.DBR = 0;
+            memory::write_word(&mut snes, 0x1234, 0xABCD).unwrap();
+            run_test_instruction(&mut snes, &[0xAC, 0x34, 0x12]).unwrap();
+            assert_eq!(snes.cpu.Y, 0xABCD);
+        }
+
+        #[test]
+        fn sta_absolute_16bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = false; // 16-bit accumulator
+            snes.cpu.A = 0xABCD;
+            snes.cpu.DBR = 0;
+            run_test_instruction(&mut snes, &[0x8D, 0x34, 0x12]).unwrap();
+            assert_eq!(memory::read_word(&snes, 0x1234).unwrap(), 0xABCD);
+        }
+
+        #[test]
+        fn stz_direct() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = false; // 16-bit
+            snes.cpu.D = 0x1000;
+            memory::write_word(&mut snes, 0x1020, 0xFFFF).unwrap();
+            run_test_instruction(&mut snes, &[0x64, 0x20]).unwrap();
+            assert_eq!(memory::read_word(&snes, 0x1020).unwrap(), 0x0000);
+        }
+    }
+
+    mod arithmetic_tests {
+        use super::*;
+
+        #[test]
+        fn adc_immediate_8bit_no_carry() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = true;
+            snes.cpu.A = 0x10;
+            snes.cpu.P.c = false;
+            run_test_instruction(&mut snes, &[0x69, 0x10]).unwrap();
+            assert_eq!(snes.cpu.A & 0xFF, 0x20);
+            assert!(!snes.cpu.P.c);
+            assert!(!snes.cpu.P.v);
+        }
+
+        #[test]
+        fn sbc_immediate_8bit_borrow() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = true;
+            snes.cpu.A = 0x10;
+            snes.cpu.P.c = true; // No borrow
+            run_test_instruction(&mut snes, &[0xE9, 0x12]).unwrap();
+            assert_eq!(snes.cpu.A & 0xFF, 0xFE); // 16 - 18 = -2
+            assert!(!snes.cpu.P.c); // Borrow occurred
+        }
+
+        #[test]
+        fn inx_16bit_wrap() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.x = false; // 16-bit index
+            snes.cpu.X = 0xFFFF;
+            run_test_instruction(&mut snes, &[0xE8]).unwrap();
+            assert_eq!(snes.cpu.X, 0x0000);
+            assert!(snes.cpu.P.z);
+        }
+
+        #[test]
+        fn dey_8bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.x = true; // 8-bit index
+            snes.cpu.Y = 0x01;
+            run_test_instruction(&mut snes, &[0x88]).unwrap();
+            assert_eq!(snes.cpu.Y & 0xFF, 0x00);
+            assert!(snes.cpu.P.z);
+        }
+
+        #[test]
+        fn dec_absolute() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = true; // 8-bit mode
+            snes.cpu.DBR = 0;
+            memory::write_byte(&mut snes, 0x1234, 0x80).unwrap();
+            run_test_instruction(&mut snes, &[0xCE, 0x34, 0x12]).unwrap();
+            assert_eq!(memory::read_byte(&snes, 0x1234).unwrap(), 0x7F);
+        }
+    }
+
+    mod branch_jump_tests {
+        use super::*;
+
+        #[test]
+        fn beq_not_taken() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.z = false;
+            let start_pc = snes.cpu.get_pc();
+            run_test_instruction(&mut snes, &[0xF0, 0x10]).unwrap();
+            assert_eq!(snes.cpu.get_pc(), start_pc + 2);
+        }
+
+        #[test]
+        fn beq_taken() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.z = true;
+            let start_pc = snes.cpu.get_pc();
+            run_test_instruction(&mut snes, &[0xF0, 0x10]).unwrap();
+            assert_eq!(snes.cpu.get_pc(), start_pc + 2 + 0x10);
+        }
+
+        #[test]
+        fn jsr_and_rts() {
+            let mut snes = setup_test_console();
+            snes.cpu.S = 0x1FF;
+            let start_pc = snes.cpu.get_pc();
+
+            // JSR $9034
+            run_test_instruction(&mut snes, &[0x20, 0x34, 0x90]).unwrap();
+            assert_eq!(snes.cpu.get_pc() & 0xFFFF, 0x9034);
+            assert_eq!(snes.cpu.S, 0x1FD);
+
+            // RTS
+            run_test_instruction(&mut snes, &[0x60]).unwrap();
+            assert_eq!(snes.cpu.get_pc(), start_pc + 3);
+            assert_eq!(snes.cpu.S, 0x1FF);
+        }
+    }
+
+    mod stack_tests {
+        use super::*;
+
+        #[test]
+        fn pha_pla_16bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = false; // 16-bit
+            snes.cpu.A = 0xABCD;
+            snes.cpu.S = 0x1FF;
+
+            run_test_instruction(&mut snes, &[0x48]).unwrap(); // PHA
+            assert_eq!(snes.cpu.S, 0x1FD);
+            snes.cpu.A = 0; // Clear accumulator
+
+            run_test_instruction(&mut snes, &[0x68]).unwrap(); // PLA
+            assert_eq!(snes.cpu.S, 0x1FF);
+            assert_eq!(snes.cpu.A, 0xABCD);
+            assert!(snes.cpu.P.n);
+        }
+
+        #[test]
+        fn php_plp() {
+            let mut snes = setup_test_console();
+            snes.cpu.S = 0x1FF;
+            snes.cpu.P.c = true;
+            snes.cpu.P.n = true;
+
+            run_test_instruction(&mut snes, &[0x08]).unwrap(); // PHP
+
+            snes.cpu.P.c = false;
+            snes.cpu.P.n = false;
+
+            run_test_instruction(&mut snes, &[0x28]).unwrap(); // PLP
+            assert_eq!(snes.cpu.p_byte(), 0b10110101); // N, M, X, I, C should be set as per initial state
+        }
+    }
+
+    mod transfer_tests {
+        use super::*;
+
+        #[test]
+        fn tax_16bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.x = false; // 16-bit index
+            snes.cpu.A = 0xABCD;
+            run_test_instruction(&mut snes, &[0xAA]).unwrap();
+            assert_eq!(snes.cpu.X, 0xABCD);
+            assert!(snes.cpu.P.n);
+        }
+
+        #[test]
+        fn txa_8bit() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = true; // 8-bit accumulator
+            snes.cpu.A = 0xFF00; // Will be ignored
+            snes.cpu.X = 0x12AD;
+            run_test_instruction(&mut snes, &[0x8A]).unwrap();
+            assert_eq!(snes.cpu.A & 0xFF, 0xAD);
+            assert!(snes.cpu.P.n);
+        }
+
+        #[test]
+        fn tcd_and_tdc() {
+            let mut snes = setup_test_console();
+            snes.cpu.A = 0x1234;
+            run_test_instruction(&mut snes, &[0x5B]).unwrap(); // TCD
+            assert_eq!(snes.cpu.D, 0x1234);
+
+            snes.cpu.A = 0;
+            run_test_instruction(&mut snes, &[0x7B]).unwrap(); // TDC
+            assert_eq!(snes.cpu.A, 0x1234);
+        }
+    }
+
+    mod flag_tests {
+        use super::*;
+
+        #[test]
+        fn clc_sec() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.c = true;
+            run_test_instruction(&mut snes, &[0x18]).unwrap(); // CLC
+            assert!(!snes.cpu.P.c);
+            run_test_instruction(&mut snes, &[0x38]).unwrap(); // SEC
+            assert!(snes.cpu.P.c);
+        }
+
+        #[test]
+        fn sep_rep_flags() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.m = false;
+            snes.cpu.P.x = false;
+
+            // Set M and X flags
+            run_test_instruction(&mut snes, &[0xE2, 0x30]).unwrap(); // SEP #$30
+            assert!(snes.cpu.P.m);
+            assert!(snes.cpu.P.x);
+
+            // Reset M and X flags
+            run_test_instruction(&mut snes, &[0xC2, 0x30]).unwrap(); // REP #$30
+            assert!(!snes.cpu.P.m);
+            assert!(!snes.cpu.P.x);
+        }
+
+        #[test]
+        fn xce_native_to_emu() {
+            let mut snes = setup_test_console();
+            snes.cpu.P.e = false;
+            snes.cpu.P.c = true; // C=1 to set E=1
+            snes.cpu.P.m = false;
+            snes.cpu.P.x = false;
+            snes.cpu.S = 0xFFDD;
+
+            run_test_instruction(&mut snes, &[0xFB]).unwrap(); // XCE
+
+            assert!(snes.cpu.P.e);
+            assert!(!snes.cpu.P.c); // C becomes old E
+            assert!(snes.cpu.P.m); // forced
+            assert!(snes.cpu.P.x); // forced
+            assert_eq!(snes.cpu.S, 0x01DD); // SH forced to 01
         }
     }
 }

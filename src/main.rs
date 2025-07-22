@@ -13,7 +13,7 @@ use cpu::*;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use debugger::{debug_simulation, render_wrapped_instructions, DisassemblerContext, Flag};
 use log::{error, trace};
-use pretty_env_logger::{env_logger::fmt::Target, formatted_builder};
+use pretty_env_logger::env_logger::fmt::Target;
 use ratatui::{
     layout::Constraint,
     prelude::*,

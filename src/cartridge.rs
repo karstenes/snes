@@ -60,6 +60,14 @@ pub struct CartHardware {
     pub coprocessor: Option<Coprocessor>,
 }
 
+impl CartHardware {
+    pub fn new(extra_hardware: ExtraHardware, coprocessor: Option<Coprocessor>) -> Self {
+        Self {
+            extra_hardware,
+            coprocessor,
+        }
+    }
+}
 #[derive(Clone, TryFromPrimitive, Debug)]
 #[repr(u8)]
 pub enum Region {
