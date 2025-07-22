@@ -55,45 +55,51 @@ impl std::fmt::Display for InstructionWrapper {
             AddrMode::SourceDestination => {
                 write!(
                     f,
-                    "${:06X}: {} {:06X}, {:06X}",
+                    "${:06X}: {} {:06X}, {:06X} ({})",
                     self.instruction.inst_addr,
                     self.instruction.opcode,
                     self.instruction.data_addr,
                     self.instruction.dest_addr.unwrap(),
+                    self.instruction.mode
                 )
             }
             AddrMode::Accumulator | AddrMode::Implied => {
                 write!(
                     f,
-                    "${:06X}: {}",
-                    self.instruction.inst_addr, self.instruction.opcode
+                    "${:06X}: {} ({})",
+                    self.instruction.inst_addr, self.instruction.opcode, self.instruction.mode
                 )
             }
             AddrMode::Immediate => match &self.instruction.opcode {
                 OpCode::REP | OpCode::SEP | OpCode::WDM => {
                     write!(
                         f,
-                        "${:06X}: {} #{:02X}",
+                        "${:06X}: {} #{:02X} ({})",
                         self.instruction.inst_addr,
                         self.instruction.opcode,
                         self.data & 0xFF,
+                        self.instruction.mode
                     )
                 }
                 OpCode::PEA | OpCode::PER => {
                     write!(
                         f,
-                        "${:06X}: {} #{:04X}",
-                        self.instruction.inst_addr, self.instruction.opcode, self.data,
+                        "${:06X}: {} #{:04X} ({})",
+                        self.instruction.inst_addr,
+                        self.instruction.opcode,
+                        self.data,
+                        self.instruction.mode
                     )
                 }
                 _ => {
                     if self.status.m {
                         write!(
                             f,
-                            "${:06X}: {} #{:02X}",
+                            "${:06X}: {} #{:02X} ({})",
                             self.instruction.inst_addr,
                             self.instruction.opcode,
                             self.data & 0xFF,
+                            self.instruction.mode
                         )
                     } else {
                         write!(
@@ -107,8 +113,11 @@ impl std::fmt::Display for InstructionWrapper {
             _ => {
                 write!(
                     f,
-                    "${:06X}: {} ${:06X} ",
-                    self.instruction.inst_addr, self.instruction.opcode, self.instruction.data_addr,
+                    "${:06X}: {} ${:06X} ({}) ",
+                    self.instruction.inst_addr,
+                    self.instruction.opcode,
+                    self.instruction.data_addr,
+                    self.instruction.mode
                 )
             }
         }
