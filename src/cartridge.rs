@@ -342,54 +342,53 @@ pub fn load_rom(rom_file: &Path, bypass_checksum: bool) -> Result<Cartridge> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
 
     // Helper function to create a minimal valid LoROM header
     fn create_lorom_header() -> Vec<u8> {
         let mut rom = vec![0; 0x8000]; // 32KB minimal LoROM
-        
+
         // Set up header at 0x7FC0
         let header_start = 0x7FC0;
-        
+
         // Title (21 bytes)
-        let title = b"TEST ROM            ";
+        let title = b"TEST ROM             ";
         rom[header_start..header_start + 21].copy_from_slice(title);
-        
+
         // Map mode and ROM speed (0x7FD5)
         rom[0x7FD5] = 0x20; // LoROM, slow ROM
-        
+
         // Hardware type (0x7FD6)
         rom[0x7FD6] = 0x00; // ROM only
-        
+
         // ROM size (0x7FD7) - 32KB = 2^15, so we need 15-10 = 5
         rom[0x7FD7] = 0x08; // 256KB for easier testing
-        
+
         // RAM size (0x7FD8)
         rom[0x7FD8] = 0x00; // No RAM
-        
+
         // Country (0x7FD9)
         rom[0x7FD9] = 0x01; // NTSC
-        
+
         // Developer ID (0x7FDA)
         rom[0x7FDA] = 0x01;
-        
+
         // ROM version (0x7FDB)
         rom[0x7FDB] = 0x00;
-        
+
         // Calculate and set checksum
-        let checksum: u16 = rom.iter().fold(0u16, |sum, &byte| sum.wrapping_add(byte as u16));
+        let checksum: u16 = rom
+            .iter()
+            .fold(0u16, |sum, &byte| sum.wrapping_add(byte as u16));
         let checksum_complement = checksum ^ 0xFFFF;
-        
+
         // Set checksum complement (0x7FDC-0x7FDD)
         rom[0x7FDC] = (checksum_complement & 0xFF) as u8;
         rom[0x7FDD] = ((checksum_complement & 0xFF00) >> 8) as u8;
-        
+
         // Set checksum (0x7FDE-0x7FDF)
         rom[0x7FDE] = (checksum & 0xFF) as u8;
         rom[0x7FDF] = ((checksum & 0xFF00) >> 8) as u8;
-        
+
         // Set interrupt vectors
         let vector_start = 0x7FE4;
         // COP vector
@@ -410,7 +409,7 @@ mod tests {
         // IRQ vector
         rom[vector_start + 10] = 0x00;
         rom[vector_start + 11] = 0x80;
-        
+
         // Emulation mode vectors
         let emu_vector_start = 0x7FF4;
         // COP vector (emu)
@@ -431,5 +430,24 @@ mod tests {
         // IRQ/BRK vector (emu)
         rom[emu_vector_start + 10] = 0x00;
         rom[emu_vector_start + 11] = 0x80;
-        
+
         rom
+    }
+
+    #[test]
+    fn test_create_lorom_header() {
+        let header = create_lorom_header();
+        assert_eq!(header.len(), 0x8000);
+
+        // Verify title
+        let title_start = 0x7FC0;
+        let title = &header[title_start..title_start + 21];
+        assert_eq!(&title[0..8], b"TEST ROM");
+
+        // Verify map mode
+        assert_eq!(header[0x7FD5], 0x20);
+
+        // Verify hardware type
+        assert_eq!(header[0x7FD6], 0x00);
+    }
+}

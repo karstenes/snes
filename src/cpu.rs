@@ -2274,6 +2274,9 @@ pub fn execute_instruction(
                 snes.cpu.S = (snes.cpu.S & 0x00FF) | 0x0100;
             }
         }
+        OpCode::NOP => {
+            // No operation - do nothing
+        }
         _ => todo!("{} Not implemented yet", instruction.opcode),
     }
     snes.cpu.PC += instruction.length(snes.cpu.P.m, snes.cpu.P.x) as u16;

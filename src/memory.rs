@@ -19,7 +19,7 @@ pub fn read_word(snes: &Console, addr: u32) -> Result<u16> {
                 _ => bail!("Write to unknown/writeonly MMIO Register"),
             }
         }
-        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+        addr if (addr_word >= 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
@@ -47,7 +47,7 @@ pub fn peek_word(snes: &Console, addr: u32) -> Result<u16> {
                 _ => bail!("Read from unknown/writeonly MMIO Register"),
             }
         }
-        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+        addr if (addr_word >= 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
@@ -113,7 +113,7 @@ pub fn read_byte(snes: &Console, addr: u32) -> Result<u8> {
                 _ => bail!("Read from unknown/writeonly MMIO Register"),
             }
         }
-        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+        addr if (addr_word >= 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
@@ -137,7 +137,7 @@ pub fn peek_byte(snes: &Console, addr: u32) -> Result<u8> {
                 _ => bail!("Read from unknown/writeonly MMIO Register"),
             }
         }
-        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+        addr if (addr_word >= 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
@@ -517,7 +517,7 @@ pub fn write_word(snes: &mut Console, addr: u32, data: u16) -> Result<()> {
                 }
             }
         }
-        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+        addr if (addr_word >= 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
@@ -700,7 +700,7 @@ pub fn write_byte(snes: &mut Console, addr: u32, data: u8) -> Result<()> {
                 }
             }
         }
-        addr if (addr_word > 0x8000 && (bank < 0x40 || bank >= 0x80))
+        addr if (addr_word >= 0x8000 && (bank < 0x40 || bank >= 0x80))
             || bank >= 0xC0
             || (bank >= 0x40 && bank < 0x7E) =>
         {
@@ -772,7 +772,7 @@ fn write_register_byte(snes: &mut Console, addr: u32, val: u8) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cartridge::*;
+
     use crate::cpu::*;
     use crate::registers::*;
 
