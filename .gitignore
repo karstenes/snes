@@ -2,6 +2,8 @@
 /.vscode
 /logs
 
+*.txt
+*.smc
 *.exe
 *.sfc
 *.py
